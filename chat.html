@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juri - Dein Rechtsberater</title>
+    <link rel="stylesheet" href="assets/css/variables.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .chat-container { width: 100%; max-width: 800px; height: 90vh; background: white; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; overflow: hidden; }
+        .chat-header { background: var(--primary-color); color: white; padding: var(--spacing-lg); display: flex; justify-content: space-between; align-items: center; }
+        .chat-header h1 { font-size: 20px; display: flex; align-items: center; gap: var(--spacing-sm); }
+        .admin-link { background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: var(--radius-sm); color: white; text-decoration: none; font-size: 12px; transition: var(--transition-fast); }
+        .admin-link:hover { background: rgba(255,255,255,0.3); }
+        .chat-messages { flex: 1; overflow-y: auto; padding: var(--spacing-lg); background: var(--surface-dark); }
+        .welcome-screen { text-align: center; padding: var(--spacing-xl); }
+        .juri-avatar { margin: 0 auto var(--spacing-lg); }
+        .greeting { font-size: 24px; font-weight: 600; margin-bottom: var(--spacing-sm); color: var(--text-primary); }
+        .subtext { color: var(--text-secondary); margin-bottom: var(--spacing-xl); }
+        .message { margin-bottom: var(--spacing-md); display: flex; gap: var(--spacing-sm); animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .message.user { flex-direction: row-reverse; }
+        .message-avatar { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; }
+        .message-content { max-width: 70%; padding: var(--spacing-md); border-radius: var(--radius-md); background: white; box-shadow: var(--shadow-sm); }
+        .message.user .message-content { background: var(--primary-color); color: white; }
+        .message-title { font-weight: 600; margin-bottom: var(--spacing-xs); font-size: 16px; }
+        .message-subtitle { font-size: 14px; opacity: 0.8; margin-bottom: var(--spacing-sm); }
+        .chat-input-area { padding: var(--spacing-md); background: white; border-top: 1px solid var(--border); }
+        .answer-options { display: flex; flex-direction: column; gap: var(--spacing-xs); margin-top: var(--spacing-sm); }
+        .answer-btn { padding: var(--spacing-sm) var(--spacing-md); border: 2px solid var(--border); border-radius: var(--radius-sm); background: white; cursor: pointer; transition: var(--transition-fast); text-align: left; font-size: 14px; }
+        .answer-btn:hover { border-color: var(--primary-color); background: var(--surface-dark); }
+        .checkbox-option { display: flex; align-items: center; gap: var(--spacing-sm); padding: var(--spacing-sm) var(--spacing-md); border: 2px solid var(--border); border-radius: var(--radius-sm); background: white; cursor: pointer; transition: var(--transition-fast); }
+        .checkbox-option:hover { border-color: var(--primary-color); background: var(--surface-dark); }
+        .checkbox-option.selected { border-color: var(--primary-color); background: rgba(91, 75, 160, 0.1); }
+        .checkbox-option input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        .input-field { width: 100%; padding: var(--spacing-sm) var(--spacing-md); border: 2px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; margin-top: var(--spacing-sm); }
+        .input-field:focus { outline: none; border-color: var(--primary-color); }
+        .submit-btn { width: 100%; padding: var(--spacing-sm); background: var(--primary-color); color: white; border: none; border-radius: var(--radius-sm); cursor: pointer; font-size: 14px; margin-top: var(--spacing-sm); transition: var(--transition-fast); }
+        .submit-btn:hover { background: var(--primary-light); }
+        .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .loading { display: flex; gap: 4px; padding: var(--spacing-sm); }
+        .loading-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary-color); animation: bounce 1.4s infinite ease-in-out both; }
+        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+        .error-message { background: #fee; border: 1px solid #fcc; color: #c00; padding: var(--spacing-md); border-radius: var(--radius-sm); margin-top: var(--spacing-sm); }
+        .document-preview { background: var(--surface-dark); padding: var(--spacing-md); border-radius: var(--radius-sm); margin-top: var(--spacing-md); font-family: monospace; font-size: 12px; white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
+        .action-buttons { display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-sm); }
+        .action-btn { padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: white; cursor: pointer; font-size: 12px; transition: var(--transition-fast); }
+        .action-btn:hover { background: var(--surface-dark); }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="assets/js/components/juriLogo.js"></script>
+    <script src="assets/js/utils/dialogStorage.js"></script>
+    <script src="assets/js/utils/zipProcessor.js"></script>
+    <script src="assets/js/chatbot/enhancedDialogParser.js"></script>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>🤖 Juri - Dein Rechtsberater</h1>
+            <a href="admin.html" class="admin-link">⚙️ Admin</a>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="welcome-screen" id="welcomeScreen">
+                <div class="juri-avatar" id="juriAvatar"></div>
+                <div class="greeting">Hallo, ich bin Juri 👋</div>
+                <div class="subtext">Wobei kann ich dir heute helfen?</div>
+            </div>
+        </div>
+        <div class="chat-input-area" id="inputArea"></div>
+    </div>
+    <script>
+        class JuriChatbot {
+            constructor() {
+                this.dialogStructure = null;
+                this.currentNode = null;
+                this.conversationHistory = [];
+                this.variables = {};
+                this.parser = new EnhancedDialogParser();
+                this.fileIndex = new Map();
+                this.pendingMultipleChoice = null;
+                this.init();
+            }
+            async init() {
+                if (window.JuriLogo) { JuriLogo.renderAvatar('juriAvatar', 80); }
+                await this.loadDialogStructure();
+                if (this.dialogStructure) { this.buildFileIndex(); this.startDialog(); }
+                else { this.showError('Keine Dialog-Struktur gefunden. Bitte im Admin-Dashboard eine ZIP-Datei hochladen.'); }
+            }
+            async loadDialogStructure() {
+                const zipBase64 = DialogStorage.loadZip();
+                if (zipBase64) {
+                    try { const blob = this.base64ToBlob(zipBase64); this.dialogStructure = await ZipProcessor.parseZip(blob); return; }
+                    catch (e) { console.error('Error loading ZIP:', e); }
+                }
+                this.dialogStructure = DialogStorage.load();
+            }
+            base64ToBlob(base64) { const bytes = atob(base64); const arr = new Uint8Array(bytes.length); for (let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i); return new Blob([arr], { type: 'application/zip' }); }
+            buildFileIndex() {
+                const indexFiles = (node) => {
+                    if (node.type === 'file') {
+                        const parsed = this.parser.parseFile(node.content || '', node.name);
+                        if (parsed.bezeichner) { const key = parsed.bezeichner.replace(/\$/g, ''); this.fileIndex.set(key, { node, parsed }); }
+                        this.fileIndex.set(node.name, { node, parsed });
+                    }
+                    if (node.children) node.children.forEach(indexFiles);
+                };
+                if (this.dialogStructure && this.dialogStructure.children) this.dialogStructure.children.forEach(indexFiles);
+            }
+            startDialog() {
+                const firstFile = this.findFirstFile(this.dialogStructure);
+                if (firstFile) { this.currentNode = this.parser.parseFile(firstFile.content || '', firstFile.name); this.hideWelcome(); this.showQuestion(this.currentNode); }
+                else { this.showError('Keine Fragen in der Dialog-Struktur gefunden.'); }
+            }
+            findFirstFile(node) { if (node.type === 'file') return node; if (node.children) { for (const c of node.children) { const f = this.findFirstFile(c); if (f) return f; } } return null; }
+            hideWelcome() { const el = document.getElementById('welcomeScreen'); if (el) el.style.display = 'none'; }
+            showQuestion(q) { this.addMessage('bot', q); this.renderInputForQuestion(q); }
+            addMessage(sender, data) {
+                const box = document.getElementById('chatMessages');
+                const msg = document.createElement('div'); msg.className = `message ${sender}`;
+                const avatar = document.createElement('div'); avatar.className = 'message-avatar';
+                if (sender === 'bot') { avatar.innerHTML = `<svg width="40" height="40" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg"><circle cx="75" cy="75" r="75" fill="#F93D25"/><circle cx="56" cy="56" r="7" fill="#000"/><circle cx="106" cy="56" r="7" fill="#000"/><circle cx="56" cy="50" r="2" fill="#FFF"/><circle cx="106" cy="50" r="2" fill="#FFF"/><path d="M75 93c8.6 0 15.6-7 15.6-15.6H59.4C59.4 86 66.4 93 75 93z" fill="#FFF"/></svg>`; }
+                else { avatar.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'; }
+                const content = document.createElement('div'); content.className = 'message-content';
+                if (sender === 'bot') { if (data.titel) { const t=document.createElement('div'); t.className='message-title'; t.textContent=data.titel; content.appendChild(t);} if (data.untertitel) { const s=document.createElement('div'); s.className='message-subtitle'; s.textContent=data.untertitel; content.appendChild(s);} }
+                else { content.textContent = data; }
+                msg.appendChild(avatar); msg.appendChild(content); box.appendChild(msg); box.scrollTop = box.scrollHeight;
+            }
+            renderInputForQuestion(q) {
+                const area = document.getElementById('inputArea'); area.innerHTML = '';
+                switch (q.fragetyp) {
+                    case 'Single Select': this.renderSingleSelect(q, area); break;
+                    case 'Multiple Choice': this.renderMultipleChoice(q, area); break;
+                    case 'Text': this.renderTextInput(q, area, 'text'); break;
+                    case 'Number': this.renderTextInput(q, area, 'number'); break;
+                    case 'Currency': this.renderTextInput(q, area, 'number', 'CHF'); break;
+                    case 'Date': this.renderTextInput(q, area, 'date'); break;
+                    case 'Person': this.renderPersonInput(q, area); break;
+                    case 'Address': this.renderAddressInput(q, area); break;
+                    default: this.renderTextInput(q, area, 'text');
+                }
+            }
+            renderSingleSelect(q, c) { const div = document.createElement('div'); div.className='answer-options'; q.antworten.forEach(a=>{ const b=document.createElement('button'); b.className='answer-btn'; b.textContent=a; b.onclick=()=>this.handleAnswer(q,a); div.appendChild(b);}); c.appendChild(div);}            
+            renderMultipleChoice(q, c) { const div=document.createElement('div'); div.className='answer-options'; const selected=new Set(); q.antworten.forEach(a=>{ const lab=document.createElement('label'); lab.className='checkbox-option'; const cb=document.createElement('input'); cb.type='checkbox'; cb.value=a; cb.onchange=(e)=>{ if(e.target.checked){selected.add(a); lab.classList.add('selected');} else {selected.delete(a); lab.classList.remove('selected');}}; const span=document.createElement('span'); span.textContent=a; lab.appendChild(cb); lab.appendChild(span); div.appendChild(lab);}); const btn=document.createElement('button'); btn.className='submit-btn'; btn.textContent='Weiter'; btn.onclick=()=>{ const arr=[...selected]; if(arr.length>0){ this.handleAnswer(q, arr.join(', ')); } }; c.appendChild(div); c.appendChild(btn);}            
+            renderTextInput(q,c,type='text',suffix='') { const input=document.createElement('input'); input.className='input-field'; input.type=type; input.placeholder=suffix?`Betrag in ${suffix}`:'Deine Antwort...'; const btn=document.createElement('button'); btn.className='submit-btn'; btn.textContent='Absenden'; btn.onclick=()=>{ if(input.value.trim()){ const value=suffix?`${input.value} ${suffix}`:input.value; this.handleAnswer(q,value);} }; input.addEventListener('keypress',(e)=>{ if(e.key==='Enter'&&input.value.trim()){ btn.click(); } }); c.appendChild(input); c.appendChild(btn); input.focus(); }
+            renderPersonInput(q,c) { const fields=['Vorname','Nachname']; const inputs={}; fields.forEach(f=>{ const i=document.createElement('input'); i.className='input-field'; i.type='text'; i.placeholder=f; inputs[f]=i; c.appendChild(i);}); const btn=document.createElement('button'); btn.className='submit-btn'; btn.textContent='Absenden'; btn.onclick=()=>{ const vals=fields.map(f=>inputs[f].value.trim()).filter(v=>v); if(vals.length===fields.length){ this.handleAnswer(q, vals.join(' ')); } }; c.appendChild(btn); inputs['Vorname'].focus(); }
+            renderAddressInput(q,c) { const fields=['Strasse','PLZ','Ort']; const inputs={}; fields.forEach(f=>{ const i=document.createElement('input'); i.className='input-field'; i.type=(f==='PLZ')?'number':'text'; i.placeholder=f; inputs[f]=i; c.appendChild(i);}); const btn=document.createElement('button'); btn.className='submit-btn'; btn.textContent='Absenden'; btn.onclick=()=>{ const vals=fields.map(f=>inputs[f].value.trim()).filter(v=>v); if(vals.length===fields.length){ this.handleAnswer(q, vals.join(', ')); } }; c.appendChild(btn); inputs['Strasse'].focus(); }
+            async handleAnswer(q, answer) {
+                this.addMessage('user', answer);
+                this.conversationHistory.push({ question: q.titel, answer, designator: q.bezeichner });
+                if (q.bezeichner) { const varName = q.bezeichner.replace(/\$/g,''); this.variables[varName] = answer; }
+                let scriptResult = { goto: null, variables: {} };
+                if (q.script) { scriptResult = this.parser.executeScript(q.script, this.variables); Object.assign(this.variables, scriptResult.variables); }
+                this.showLoading(); await new Promise(r=>setTimeout(r,500));
+                if (scriptResult.goto) { this.navigateToQuestion(scriptResult.goto); }
+                else { this.nextQuestion(); }
+            }
+            navigateToQuestion(targetId) {
+                const target = this.fileIndex.get(targetId) || this.fileIndex.get(`${targetId}.txt`);
+                if (target) { this.currentNode = target.parsed; this.showQuestion(this.currentNode); }
+                else { const node = this.findFileByName(this.dialogStructure, targetId); if (node) { this.currentNode = this.parser.parseFile(node.content||'', node.name); this.showQuestion(this.currentNode); } else { this.showError(`Ziel-Frage "${targetId}" nicht gefunden.`); this.endDialog(); } }
+            }
+            findFileByName(node, name) { if (node.type==='file' && node.name===name) return node; if (node.children) { for (const c of node.children) { const f=this.findFileByName(c,name); if (f) return f; } } return null; }
+            nextQuestion() {
+                const files = this.getAllFiles(this.dialogStructure);
+                const currentIndex = files.findIndex(f => f.name === this.currentNode.fileName);
+                const next = currentIndex >= 0 && currentIndex < files.length -1 ? files[currentIndex+1] : null;
+                if (next) { this.currentNode = this.parser.parseFile(next.content||'', next.name); this.showQuestion(this.currentNode); }
+                else { this.endDialog(); }
+            }
+            getAllFiles(node) { const out=[]; const walk=(n)=>{ if(n.type==='file') out.push(n); if(n.children) n.children.forEach(walk); }; walk(node); return out; }
+            showLoading() { const area=document.getElementById('inputArea'); area.innerHTML='<div class="loading"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div></div>'; }
+            hideLoading() {}
+            endDialog() {
+                const area = document.getElementById('inputArea'); area.innerHTML='';
+                const summary = document.createElement('div'); summary.className='message-content'; summary.innerHTML = `<div class="message-title">✅ Dialog abgeschlossen!</div><div class="message-subtitle">Vielen Dank für deine Angaben.</div>`;
+                const docs = this.generateDocuments(); if (docs.length>0) { const prev=document.createElement('div'); prev.className='document-preview'; prev.textContent = docs.join('\n\n---\n\n'); summary.appendChild(prev); }
+                const actions=document.createElement('div'); actions.className='action-buttons'; const dl=document.createElement('button'); dl.className='action-btn'; dl.textContent='📄 Zusammenfassung herunterladen'; dl.onclick=()=>this.downloadSummary(); const rs=document.createElement('button'); rs.className='action-btn'; rs.textContent='🔄 Neu starten'; rs.onclick=()=>location.reload(); actions.appendChild(dl); actions.appendChild(rs); summary.appendChild(actions);
+                const box = document.getElementById('chatMessages'); const msg=document.createElement('div'); msg.className='message bot'; const avatar=document.createElement('div'); avatar.className='message-avatar'; avatar.innerHTML = `<svg width="40" height="40" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg"><circle cx=\"75\" cy=\"75\" r=\"75\" fill=\"#F93D25\"/><circle cx=\"56\" cy=\"56\" r=\"7\" fill=\"#000\"/><circle cx=\"106\" cy=\"56\" r=\"7\" fill=\"#000\"/><circle cx=\"56\" cy=\"50\" r=\"2\" fill=\"#FFF\"/><circle cx=\"106\" cy=\"50\" r=\"2\" fill=\"#FFF\"/><path d=\"M75 93c8.6 0 15.6-7 15.6-15.6H59.4C59.4 86 66.4 93 75 93z\" fill=\"#FFF\"/></svg>`; msg.appendChild(avatar); msg.appendChild(summary); box.appendChild(msg); box.scrollTop=box.scrollHeight;
+            }
+            generateDocuments() { const docs=[]; for (const entry of this.conversationHistory) { const key = entry.designator? entry.designator.replace(/\$/g,'') : null; const data = key? this.fileIndex.get(key) : null; if (data && data.parsed.dokumenttext) { const d=this.parser.generateDocument(data.parsed.dokumenttext, this.variables); docs.push(d);} } return docs; }
+            downloadSummary() {
+                let text = '=== JURI DIALOG ZUSAMMENFASSUNG ===\n\n';
+                text += `Datum: ${new Date().toLocaleString('de-CH')}\n\n`;
+                text += '--- ANTWORTEN ---\n\n';
+                this.conversationHistory.forEach((e,i)=>{ text += `${i+1}. ${e.question}\n   Antwort: ${e.answer}\n\n`; });
+                text += '\n--- VARIABLEN ---\n\n'; Object.entries(this.variables).forEach(([k,v])=>{ text += `${k}: ${v}\n`; });
+                const docs = this.generateDocuments(); if (docs.length>0) { text += '\n--- GENERIERTE DOKUMENTE ---\n\n' + docs.join('\n\n---\n\n'); }
+                const blob = new Blob([text], { type: 'text/plain;charset=utf-8' }); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`juri-zusammenfassung-${Date.now()}.txt`; a.click(); URL.revokeObjectURL(url);
+            }
+            showError(message) { const area=document.getElementById('inputArea'); const err=document.createElement('div'); err.className='error-message'; err.textContent=message; area.appendChild(err); const btn=document.createElement('button'); btn.className='submit-btn'; btn.textContent='🔄 Neu starten'; btn.onclick=()=>location.reload(); area.appendChild(btn); }
+        }
+        let chatbot; document.addEventListener('DOMContentLoaded', () => { chatbot = new JuriChatbot(); });
+    </script>
+</body>
+</html>
+
+
