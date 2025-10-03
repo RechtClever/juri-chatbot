@@ -62,6 +62,8 @@
     <script src="assets/js/components/juriLogo.js"></script>
     <script src="assets/js/utils/dialogStorage.js"></script>
     <script src="assets/js/utils/zipProcessor.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@2.4.0/dist/purify.min.js"></script>
     <script src="assets/js/chatbot/enhancedDialogParser.js"></script>
 </head>
 <body>
@@ -132,7 +134,31 @@
                 if (sender === 'bot') { avatar.innerHTML = `<svg width="40" height="40" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg"><circle cx="75" cy="75" r="75" fill="#F93D25"/><circle cx="56" cy="56" r="7" fill="#000"/><circle cx="106" cy="56" r="7" fill="#000"/><circle cx="56" cy="50" r="2" fill="#FFF"/><circle cx="106" cy="50" r="2" fill="#FFF"/><path d="M75 93c8.6 0 15.6-7 15.6-15.6H59.4C59.4 86 66.4 93 75 93z" fill="#FFF"/></svg>`; }
                 else { avatar.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'; }
                 const content = document.createElement('div'); content.className = 'message-content';
-                if (sender === 'bot') { if (data.titel) { const t=document.createElement('div'); t.className='message-title'; t.textContent=data.titel; content.appendChild(t);} if (data.untertitel) { const s=document.createElement('div'); s.className='message-subtitle'; s.textContent=data.untertitel; content.appendChild(s);} }
+                if (sender === 'bot') {
+                    // Render titel and untertitel as Markdown (sanitized)
+                    if (data.titel) {
+                        const t = document.createElement('div'); t.className = 'message-title';
+                        try {
+                            const raw = String(data.titel || '');
+                            const html = window.marked ? marked.parse(raw) : raw;
+                            t.innerHTML = window.DOMPurify ? DOMPurify.sanitize(html) : html;
+                        } catch (e) {
+                            t.textContent = data.titel;
+                        }
+                        content.appendChild(t);
+                    }
+                    if (data.untertitel) {
+                        const s = document.createElement('div'); s.className = 'message-subtitle';
+                        try {
+                            const raw = String(data.untertitel || '');
+                            const html = window.marked ? marked.parse(raw) : raw;
+                            s.innerHTML = window.DOMPurify ? DOMPurify.sanitize(html) : html;
+                        } catch (e) {
+                            s.textContent = data.untertitel;
+                        }
+                        content.appendChild(s);
+                    }
+                }
                 else { content.textContent = data; }
                 msg.appendChild(avatar); msg.appendChild(content); box.appendChild(msg); box.scrollTop = box.scrollHeight;
             }
@@ -150,8 +176,37 @@
                     default: this.renderTextInput(q, area, 'text');
                 }
             }
-            renderSingleSelect(q, c) { const div = document.createElement('div'); div.className='answer-options'; q.antworten.forEach(a=>{ const b=document.createElement('button'); b.className='answer-btn'; b.textContent=a; b.onclick=()=>this.handleAnswer(q,a); div.appendChild(b);}); c.appendChild(div);}            
-            renderMultipleChoice(q, c) { const div=document.createElement('div'); div.className='answer-options'; const selected=new Set(); q.antworten.forEach(a=>{ const lab=document.createElement('label'); lab.className='checkbox-option'; const cb=document.createElement('input'); cb.type='checkbox'; cb.value=a; cb.onchange=(e)=>{ if(e.target.checked){selected.add(a); lab.classList.add('selected');} else {selected.delete(a); lab.classList.remove('selected');}}; const span=document.createElement('span'); span.textContent=a; lab.appendChild(cb); lab.appendChild(span); div.appendChild(lab);}); const btn=document.createElement('button'); btn.className='submit-btn'; btn.textContent='Weiter'; btn.onclick=()=>{ const arr=[...selected]; if(arr.length>0){ this.handleAnswer(q, arr.join(', ')); } }; c.appendChild(div); c.appendChild(btn);}            
+            renderSingleSelect(q, c) {
+                const div = document.createElement('div'); div.className='answer-options';
+                q.antworten.forEach(a=>{
+                    const b=document.createElement('button'); b.className='answer-btn';
+                    try {
+                        const raw = String(a || '');
+                        const html = window.marked ? marked.parse(raw) : raw;
+                        b.innerHTML = window.DOMPurify ? DOMPurify.sanitize(html) : html;
+                    } catch (e) { b.textContent = a; }
+                    b.onclick=()=>this.handleAnswer(q,a);
+                    div.appendChild(b);
+                });
+                c.appendChild(div);
+            }
+            renderMultipleChoice(q, c) {
+                const div=document.createElement('div'); div.className='answer-options'; const selected=new Set();
+                q.antworten.forEach(a=>{
+                    const lab=document.createElement('label'); lab.className='checkbox-option';
+                    const cb=document.createElement('input'); cb.type='checkbox'; cb.value=a;
+                    cb.onchange=(e)=>{ if(e.target.checked){selected.add(a); lab.classList.add('selected');} else {selected.delete(a); lab.classList.remove('selected');}};
+                    const span=document.createElement('span');
+                    try {
+                        const raw = String(a || '');
+                        const html = window.marked ? marked.parse(raw) : raw;
+                        span.innerHTML = window.DOMPurify ? DOMPurify.sanitize(html) : html;
+                    } catch (e) { span.textContent = a; }
+                    lab.appendChild(cb); lab.appendChild(span); div.appendChild(lab);
+                });
+                const btn=document.createElement('button'); btn.className='submit-btn'; btn.textContent='Weiter'; btn.onclick=()=>{ const arr=[...selected]; if(arr.length>0){ this.handleAnswer(q, arr.join(', ')); } };
+                c.appendChild(div); c.appendChild(btn);
+            }
             renderTextInput(q,c,type='text',suffix='') { const input=document.createElement('input'); input.className='input-field'; input.type=type; input.placeholder=suffix?`Betrag in ${suffix}`:'Deine Antwort...'; const btn=document.createElement('button'); btn.className='submit-btn'; btn.textContent='Absenden'; btn.onclick=()=>{ if(input.value.trim()){ const value=suffix?`${input.value} ${suffix}`:input.value; this.handleAnswer(q,value);} }; input.addEventListener('keypress',(e)=>{ if(e.key==='Enter'&&input.value.trim()){ btn.click(); } }); c.appendChild(input); c.appendChild(btn); input.focus(); }
             renderPersonInput(q,c) { const fields=['Vorname','Nachname']; const inputs={}; fields.forEach(f=>{ const i=document.createElement('input'); i.className='input-field'; i.type='text'; i.placeholder=f; inputs[f]=i; c.appendChild(i);}); const btn=document.createElement('button'); btn.className='submit-btn'; btn.textContent='Absenden'; btn.onclick=()=>{ const vals=fields.map(f=>inputs[f].value.trim()).filter(v=>v); if(vals.length===fields.length){ this.handleAnswer(q, vals.join(' ')); } }; c.appendChild(btn); inputs['Vorname'].focus(); }
             renderAddressInput(q,c) { const fields=['Strasse','PLZ','Ort']; const inputs={}; fields.forEach(f=>{ const i=document.createElement('input'); i.className='input-field'; i.type=(f==='PLZ')?'number':'text'; i.placeholder=f; inputs[f]=i; c.appendChild(i);}); const btn=document.createElement('button'); btn.className='submit-btn'; btn.textContent='Absenden'; btn.onclick=()=>{ const vals=fields.map(f=>inputs[f].value.trim()).filter(v=>v); if(vals.length===fields.length){ this.handleAnswer(q, vals.join(', ')); } }; c.appendChild(btn); inputs['Strasse'].focus(); }

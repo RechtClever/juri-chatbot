@@ -110,6 +110,8 @@
     <script src="assets/js/components/rechtCleverLogo.js"></script>
     <script src="assets/js/utils/dialogStorage.js"></script>
     <script src="assets/js/utils/zipProcessor.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@2.4.0/dist/purify.min.js"></script>
 </head>
 <body>
         <div class="container">
@@ -122,6 +124,7 @@
                 <button class="btn btn-sm" onclick="editor.newQuestion()">➕ Frage</button>
                 <button class="btn btn-sm" onclick="editor.newFolder()">📁 Ordner</button>
                 <button class="btn-secondary btn-sm" onclick="editor.importZip()">📂 Import</button>
+                <button id="claudeBtn" class="btn-secondary btn-sm" title="Workflow mit Claude generieren">🤖 Claude</button>
             </div>
             <div class="section-header">DIALOG STRUKTUR</div>
             <div class="breadcrumb-nav" id="breadcrumbNav" style="padding: var(--spacing-sm); border-bottom: 1px solid var(--admin-border); font-size: 12px; color: var(--admin-text-muted); display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
@@ -248,6 +251,26 @@
         </div>
     </div>
     <input type="file" id="zipFileInput" accept=".zip" class="file-input">
+    <!-- Claude integration: hidden prompt and result modal -->
+    <textarea id="claudePromptSource" style="display:none" aria-hidden="true">### CHATBOT-ENTWICKLUNGSANFRAGE FÜR MIETRECHT-CHATBOT
+
+## PROJEKTHINTERGRUND
+Ich entwickle einen Chatbot für rechtliche Beratung im Mietrecht, speziell für Nebenkostenabrechnungen nach schweizerischem Recht. Der Chatbot basiert auf einer strukturierten Verzeichnishierarchie mit Fragedateien, Antwortordnern und Scripts.
+
+## TECHNISCHE SPEZIFIKATIONEN
+
+... (Bitte kompletten Prompt hier einfügen wie vom Benutzer bereitgestellt) ...
+</textarea>
+    <div id="claudeResultModal" style="display:none; position:fixed; right:20px; bottom:20px; width:420px; max-height:70vh; overflow:auto; background:var(--admin-surface); border:1px solid var(--admin-border); border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,0.15); z-index:9999; padding:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
+            <strong>Claude Workflow Generator</strong>
+            <div>
+                <button id="claudeCopyBtn" class="btn-small">Kopieren</button>
+                <button id="claudeCloseBtn" class="btn-small">Schliessen</button>
+            </div>
+        </div>
+        <pre id="claudeResultContent" style="white-space:pre-wrap; font-size:12px;">Warte auf Ergebnis...</pre>
+    </div>
     <script>
         class EnhancedDialogEditor {
             constructor() {
@@ -708,11 +731,11 @@
                 answers.forEach((answer, index) => {
                     const listItem = document.createElement('div');
                     listItem.className = 'list-item';
-                    listItem.innerHTML = `
-                        <input type="text" value="${answer}">
-                        <button class="btn-small" onclick="editor.createFollowUp('${answer}', ${index})">➕ Follow-up</button>
-                        <button class="btn-small danger" onclick="this.parentElement.remove(); editor.updateLivePreview()">✕</button>
-                    `;
+                    // Use DOM methods to avoid quoting issues and allow Markdown in inputs
+                    const input = document.createElement('input'); input.type = 'text'; input.value = answer;
+                    const followBtn = document.createElement('button'); followBtn.className = 'btn-small'; followBtn.textContent = '➕ Follow-up'; followBtn.addEventListener('click', () => this.createFollowUp(input.value, index));
+                    const delBtn = document.createElement('button'); delBtn.className = 'btn-small danger'; delBtn.textContent = '✕'; delBtn.addEventListener('click', (e) => { e.currentTarget.parentElement.remove(); this.updateLivePreview(); });
+                    listItem.appendChild(input); listItem.appendChild(followBtn); listItem.appendChild(delBtn);
                     listItem.querySelector('input').addEventListener('input', () => this.updateLivePreview());
                     answersList.appendChild(listItem);
                 });
@@ -779,11 +802,21 @@
                 const preview = document.getElementById('livePreview');
                 const generatedContent = document.getElementById('generatedContent');
                 const formData = this.getFormData();
-                let previewHtml = `<strong>${formData.titel}</strong>`;
-                if (formData.untertitel) previewHtml += `<br><em>${formData.untertitel}</em>`;
-                if (formData.fragetyp === 'Single Select' || formData.fragetyp === 'Multiple Choice') {
-                    previewHtml += '<br><br>Optionen:';
-                    formData.antworten.forEach(answer => { previewHtml += `<br>• ${answer}`; });
+                let previewHtml = '';
+                try {
+                    const titleMd = formData.titel || '';
+                    const subtitleMd = formData.untertitel || '';
+                    const titleHtml = window.marked ? marked.parse(titleMd) : titleMd;
+                    const subtitleHtml = window.marked ? marked.parse(subtitleMd) : subtitleMd;
+                    previewHtml += `<div class=\"preview-title\">${window.DOMPurify ? DOMPurify.sanitize(titleHtml) : titleHtml}</div>`;
+                    if (subtitleMd) previewHtml += `<div class=\"preview-subtitle\">${window.DOMPurify ? DOMPurify.sanitize(subtitleHtml) : subtitleHtml}</div>`;
+                    if (formData.fragetyp === 'Single Select' || formData.fragetyp === 'Multiple Choice') {
+                        previewHtml += '<br><div class=\"preview-options\"><strong>Optionen:</strong>';
+                        formData.antworten.forEach(answer => { const html = window.marked ? marked.parse(String(answer || '')) : String(answer || ''); previewHtml += `<div>• ${window.DOMPurify ? DOMPurify.sanitize(html) : html}</div>`; });
+                        previewHtml += '</div>';
+                    }
+                } catch (e) {
+                    previewHtml = `<strong>${formData.titel}</strong>` + (formData.untertitel ? `<br><em>${formData.untertitel}</em>` : '');
                 }
                 preview.innerHTML = previewHtml;
                 generatedContent.textContent = this.generateTxtContent(formData);
@@ -827,8 +860,10 @@
                 const answersList = document.getElementById('answersList');
                 const listItem = document.createElement('div');
                 listItem.className = 'list-item';
-                listItem.innerHTML = `<input type="text" placeholder="Neue Antwort"><button class="btn-small danger" onclick="this.parentElement.remove(); editor.updateLivePreview()">✕</button>`;
-                listItem.querySelector('input').addEventListener('input', () => this.updateLivePreview());
+                const input = document.createElement('input'); input.type = 'text'; input.placeholder = 'Neue Antwort (Markdown erlaubt)';
+                const delBtn = document.createElement('button'); delBtn.className = 'btn-small danger'; delBtn.textContent = '✕'; delBtn.addEventListener('click', (e) => { e.currentTarget.parentElement.remove(); this.updateLivePreview(); });
+                listItem.appendChild(input); listItem.appendChild(delBtn);
+                input.addEventListener('input', () => this.updateLivePreview());
                 answersList.appendChild(listItem);
                 listItem.querySelector('input').focus();
             }
@@ -862,6 +897,55 @@
                 this.renderTree();
                 this.saveStructure();
                 this.setStatus('Datei aktualisiert');
+            }
+
+            // Claude integration helper functions
+            async callClaudeWithPrompt(prompt) {
+                const endpoints = ['/api/claude', 'http://localhost:3001/api/claude'];
+                for (const url of endpoints) {
+                    try {
+                        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) });
+                        if (!res.ok) {
+                            // try next
+                            continue;
+                        }
+                        const data = await res.json();
+                        const text = (data && (data.output?.text || data.choices?.[0]?.text || data.reply || JSON.stringify(data))) || JSON.stringify(data);
+                        return text;
+                    } catch (err) {
+                        // try next endpoint
+                        continue;
+                    }
+                }
+                return 'ERROR: Could not reach /api/claude on same origin or http://localhost:3001';
+            }
+
+            async generateWorkflowWithClaude() {
+                const promptBase = document.getElementById('claudePromptSource').value || '';
+                const currentFile = this.currentFile;
+                let context = '';
+                if (currentFile) {
+                    context += `\n\n--- BEGIN CURRENT FILE: ${currentFile.name} ---\n`;
+                    context += (currentFile.content || currentFile.enhancedContent && JSON.stringify(currentFile.enhancedContent) || '') + '\n';
+                    context += `--- END CURRENT FILE ---\n\n`;
+                }
+                const fullPrompt = `${promptBase}\n\nCONTEXT:\n${context}\n\nPlease respond with the required CREATE_FILE/CREATE_DIR/MODIFY_FILE/DELETE instructions only.`;
+                document.getElementById('claudeResultContent').textContent = 'Sende an Claude...';
+                document.getElementById('claudeResultModal').style.display = 'block';
+                const result = await this.callClaudeWithPrompt(fullPrompt);
+                document.getElementById('claudeResultContent').textContent = result;
+            }
+
+            attachClaudeUI() {
+                const btn = document.getElementById('claudeBtn');
+                if (btn) btn.addEventListener('click', (e) => { e.preventDefault(); this.generateWorkflowWithClaude(); });
+                const closeBtn = document.getElementById('claudeCloseBtn');
+                if (closeBtn) closeBtn.addEventListener('click', () => { document.getElementById('claudeResultModal').style.display = 'none'; });
+                const copyBtn = document.getElementById('claudeCopyBtn');
+                if (copyBtn) copyBtn.addEventListener('click', () => {
+                    const txt = document.getElementById('claudeResultContent').textContent || '';
+                    navigator.clipboard && navigator.clipboard.writeText(txt);
+                });
             }
             deleteFile() {
                 if (!this.currentFile || !confirm('Datei wirklich löschen?')) return;
@@ -949,7 +1033,16 @@
                 };
             }
         }
-        let editor; document.addEventListener('DOMContentLoaded', () => { editor = new EnhancedDialogEditor(); });
+
+        // end of class EnhancedDialogEditor
+
+        // Create editor instance on DOMContentLoaded and wire Claude UI
+        let editor;
+        document.addEventListener('DOMContentLoaded', () => {
+            editor = new EnhancedDialogEditor();
+            window.editor = editor;
+            if (editor && typeof editor.attachClaudeUI === 'function') editor.attachClaudeUI();
+        });
     </script>
 </body>
 </html>
