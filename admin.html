@@ -55,8 +55,9 @@
         .success { background: rgba(46, 158, 91, 0.1); border-color: var(--secondary-color); color: var(--secondary-color); }
         /* Feature tiles */
         .feature-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--spacing-md); margin: var(--spacing-lg) 0; }
-        .feature-tile { background: var(--admin-surface-light); border: 1px solid var(--admin-border); border-radius: var(--radius-md); padding: var(--spacing-md); text-align: center; cursor: pointer; transition: transform 0.12s ease, border-color 0.12s ease; }
-        .feature-tile:hover { transform: translateY(-4px); border-color: var(--primary-color); }
+    .feature-tile { background: var(--admin-surface-light); border: 1px solid var(--admin-border); border-radius: var(--radius-md); padding: var(--spacing-md); text-align: center; cursor: pointer; transition: transform 0.12s ease, border-color 0.12s ease; user-select: none; }
+    .feature-tile:hover { transform: translateY(-4px); border-color: var(--primary-color); }
+    .feature-tile.active { border-color: var(--secondary-color); box-shadow: 0 6px 18px rgba(20,20,20,0.06); transform: translateY(-6px); }
         .feature-tile .ft-icon { font-size: 24px; display: block; margin-bottom: 8px; }
         .feature-tile .ft-title { font-weight: 700; color: var(--primary-color); }
         .feature-hidden { display: none; }
@@ -91,22 +92,22 @@
 
         <!-- Feature tiles: click to reveal sections below -->
         <div class="feature-tiles" id="featureTiles">
-            <div class="feature-tile" onclick="admin.toggleFeature('importSection')">
+            <div class="feature-tile" data-target="importSection">
                 <div class="ft-icon">📤</div>
                 <div class="ft-title">Import</div>
                 <div class="ft-desc" style="font-size:12px;color:var(--admin-text-muted);">ZIP hochladen / Storage</div>
             </div>
-            <div class="feature-tile" onclick="admin.toggleFeature('actionsSection')">
+            <div class="feature-tile" data-target="actionsSection">
                 <div class="ft-icon">⚙️</div>
                 <div class="ft-title">Aktionen</div>
                 <div class="ft-desc" style="font-size:12px;color:var(--admin-text-muted);">Export, Deploy, Validierung</div>
             </div>
-            <div class="feature-tile" onclick="admin.toggleFeature('structureSection')">
+            <div class="feature-tile" data-target="structureSection">
                 <div class="ft-icon">📁</div>
                 <div class="ft-title">Struktur / Editor</div>
                 <div class="ft-desc" style="font-size:12px;color:var(--admin-text-muted);">Struktur anzeigen / Editor öffnen</div>
             </div>
-            <div class="feature-tile" onclick="admin.toggleFeature('variablesSection')">
+            <div class="feature-tile" data-target="variablesSection">
                 <div class="ft-icon">🔤</div>
                 <div class="ft-title">Variablen</div>
                 <div class="ft-desc" style="font-size:12px;color:var(--admin-text-muted);">Alle Variablen anzeigen</div>
@@ -205,7 +206,21 @@
             constructor() { this.structure = null; this.init(); }
             init() {
                 if (window.RechtCleverLogo) { RechtCleverLogo.render('logoContainer', 'small'); }
-                this.setupDragAndDrop(); this.attachEventListeners(); this.loadFromStorage();
+                this.setupDragAndDrop(); this.attachEventListeners(); this.loadFromStorage(); this.attachFeatureTileHandlers();
+            }
+
+            attachFeatureTileHandlers() {
+                // wire feature tiles to toggle features reliably (ensures admin exists)
+                const tiles = document.querySelectorAll('.feature-tile[data-target]');
+                tiles.forEach(tile => {
+                    const target = tile.getAttribute('data-target');
+                    tile.addEventListener('click', (e) => {
+                        this.toggleFeature(target);
+                        // update active state
+                        tiles.forEach(t => t.classList.remove('active'));
+                        tile.classList.add('active');
+                    });
+                });
             }
             setupDragAndDrop() {
                 const zone = document.getElementById('uploadZone');
