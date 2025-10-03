@@ -380,7 +380,12 @@
             }
             getFileType(node, depth, parent) {
                 if (node.type !== 'file') return null;
-                if (parent && parent.type === 'folder') return 'question';
+                if (parent && parent.type === 'folder') {
+                    // Check if parent folder is an answer folder (short names like "ja", "nein", etc.)
+                    const parentName = parent.name.toLowerCase();
+                    const isAnswerFolder = parentName.length <= 10 && !parentName.includes(' ') && !parentName.match(/^\d/);
+                    return isAnswerFolder ? 'answer' : 'question';
+                }
                 if (parent && parent.type === 'file') return 'answer';
                 return 'question';
             }
@@ -593,7 +598,12 @@
                 // Use actual parent node to determine type to keep parity with tree rendering
                 const parent = this.findParentOf(this.structure, file);
                 if (!parent) return 'question';
-                if (parent.type === 'folder') return 'question';
+                if (parent.type === 'folder') {
+                    // Check if parent folder is an answer folder (short names like "ja", "nein", etc.)
+                    const parentName = parent.name.toLowerCase();
+                    const isAnswerFolder = parentName.length <= 10 && !parentName.includes(' ') && !parentName.match(/^\d/);
+                    return isAnswerFolder ? 'answer' : 'question';
+                }
                 if (parent.type === 'file') return 'answer';
                 return 'question';
             }
