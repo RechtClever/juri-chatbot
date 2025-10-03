@@ -328,25 +328,17 @@
                     const isCollapsed = this.collapsedFolders.has(node.path || node.name);
                     const chevron = hasChildren ? (isCollapsed ? '▶' : '▼') : '';
                     icon = `<span class="tree-chevron">${chevron}</span><span class="folder-icon">📁</span>`;
-                    nodeElement.addEventListener('click', (e) => {
-                        if (e.target.classList.contains('tree-chevron') || e.target.closest('.tree-chevron')) {
-                            e.stopPropagation();
-                            this.toggleFolder(node);
-                        } else {
-                            this.selectNode(node, nodeElement);
-                        }
+                    nodeElement.addEventListener('click', () => {
+                        this.toggleFolder(node);
+                        this.selectNode(node, nodeElement);
                     });
                 } else if (fileType === 'question') {
                     const isCollapsed = this.collapsedQuestions.has(node.path || node.name);
                     const chevron = hasChildren ? (isCollapsed ? '▶' : '▼') : '';
                     icon = `<span class="tree-chevron">${chevron}</span><span class="question-icon">❓</span>`;
-                    nodeElement.addEventListener('click', (e) => {
-                        if (e.target.classList.contains('tree-chevron') || e.target.closest('.tree-chevron')) {
-                            e.stopPropagation();
-                            this.toggleQuestion(node);
-                        } else {
-                            this.selectNode(node, nodeElement);
-                        }
+                    nodeElement.addEventListener('click', () => {
+                        if (hasChildren) this.toggleQuestion(node);
+                        this.selectNode(node, nodeElement);
                     });
                 } else if (fileType === 'answer') {
                     icon = '<span class="tree-spacer"></span><span class="answer-icon">💬</span>';
