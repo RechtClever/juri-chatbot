@@ -258,6 +258,17 @@
                 if (window.RechtCleverLogo && typeof RechtCleverLogo.render === 'function') {
                     RechtCleverLogo.render('logoContainer', 'small');
                 }
+                // Collapse all folders by default on first load for better overview
+                if (this.structure && this.structure.children) {
+                    const seedCollapsed = (node) => {
+                        if (node.type === 'folder') {
+                            const key = node.path || node.name;
+                            this.collapsedFolders.add(key);
+                        }
+                        if (node.children) node.children.forEach(child => seedCollapsed(child));
+                    };
+                    seedCollapsed(this.structure);
+                }
                 this.attachEventListeners();
                 this.renderTree();
                 this.updateQuestionTypeHandlers();
