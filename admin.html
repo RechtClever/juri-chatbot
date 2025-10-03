@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juri Admin Dashboard</title>
+    <link rel="stylesheet" href="assets/css/variables.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: var(--admin-bg); 
+            color: var(--admin-text); 
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header { background: var(--admin-surface); border-bottom: 2px solid var(--primary-color); padding: var(--spacing-lg); display: flex; justify-content: space-between; align-items: center; }
+        .header-left { display: flex; align-items: center; gap: var(--spacing-md); }
+        .logo-container { width: 100px; height: 40px; }
+        .header h1 { color: var(--admin-text); font-size: 24px; }
+        .header-actions { display: flex; gap: var(--spacing-sm); }
+        .container { flex: 1; padding: var(--spacing-xl); max-width: 1400px; width: 100%; margin: 0 auto; }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--spacing-lg); margin-bottom: var(--spacing-xl); }
+        .card { background: var(--admin-surface); border-radius: var(--radius-md); padding: var(--spacing-lg); border: 1px solid var(--admin-border); }
+        .card h2 { color: var(--primary-color); margin-bottom: var(--spacing-md); font-size: 18px; display: flex; align-items: center; gap: var(--spacing-sm); }
+        .stat-card { text-align: center; padding: var(--spacing-xl); }
+        .stat-number { font-size: 48px; font-weight: bold; color: var(--primary-color); margin-bottom: var(--spacing-sm); }
+        .stat-label { color: var(--admin-text-muted); font-size: 14px; }
+        .upload-zone { border: 2px dashed var(--admin-border); border-radius: var(--radius-md); padding: var(--spacing-xl); text-align: center; cursor: pointer; transition: var(--transition-fast); margin-bottom: var(--spacing-md); }
+        .upload-zone:hover { border-color: var(--primary-color); background: var(--admin-surface-light); }
+        .upload-zone.dragover { border-color: var(--primary-color); background: rgba(91, 75, 160, 0.1); }
+        .upload-icon { font-size: 48px; margin-bottom: var(--spacing-sm); }
+        .btn { background: var(--primary-color); color: white; border: none; padding: 10px 20px; border-radius: var(--radius-sm); cursor: pointer; font-size: 14px; transition: var(--transition-fast); display: inline-flex; align-items: center; gap: var(--spacing-xs); }
+        .btn:hover { background: var(--primary-light); }
+        .btn-secondary { background: var(--admin-surface-light); color: var(--admin-text); border: 1px solid var(--admin-border); }
+        .btn-secondary:hover { background: var(--admin-border); }
+        .btn-success { background: var(--secondary-color); }
+        .btn-danger { background: var(--juri-red); }
+        .structure-tree { max-height: 400px; overflow-y: auto; background: var(--admin-bg); padding: var(--spacing-sm); border-radius: var(--radius-sm); margin-top: var(--spacing-md); }
+        .tree-item { padding: 6px 8px; display: flex; align-items: center; gap: var(--spacing-sm); border-radius: var(--radius-sm); transition: var(--transition-fast); font-size: 14px; }
+        .tree-item:hover { background: var(--admin-surface-light); }
+        .tree-icon { width: 20px; text-align: center; }
+        .file-input { display: none; }
+        .action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-md); }
+        .action-card { background: var(--admin-surface-light); padding: var(--spacing-lg); border-radius: var(--radius-md); border: 1px solid var(--admin-border); cursor: pointer; transition: var(--transition-fast); text-align: center; }
+        .action-card:hover { border-color: var(--primary-color); background: var(--admin-surface); }
+        .action-icon { font-size: 32px; margin-bottom: var(--spacing-sm); }
+        .action-title { font-weight: 600; margin-bottom: var(--spacing-xs); }
+        .action-desc { font-size: 12px; color: var(--admin-text-muted); }
+        .status-bar { background: var(--admin-surface); border-top: 1px solid var(--admin-border); padding: var(--spacing-sm) var(--spacing-lg); display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+        .status-indicator { display: flex; align-items: center; gap: var(--spacing-xs); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--secondary-color); }
+        .alert { background: rgba(249, 61, 37, 0.1); border: 1px solid var(--juri-red); border-radius: var(--radius-sm); padding: var(--spacing-md); margin-bottom: var(--spacing-md); color: var(--juri-red); }
+        .success { background: rgba(46, 158, 91, 0.1); border-color: var(--secondary-color); color: var(--secondary-color); }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="assets/js/components/rechtCleverLogo.js"></script>
+    <script src="assets/js/utils/dialogStorage.js"></script>
+    <script src="assets/js/utils/zipProcessor.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // einfache Existenzprüfung
+            if (!window.DialogStorage || !window.ZipProcessor) {
+                console.warn('Utils nicht geladen');
+            }
+        });
+    </script>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <div class="logo-container" id="logoContainer"></div>
+            <h1>Admin Dashboard</h1>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="window.location.href='editor.html'">📝 Standard Editor</button>
+            <button class="btn btn-secondary" onclick="window.location.href='enhanced-editor.html'">✨ Enhanced Editor</button>
+            <button class="btn" onclick="window.location.href='index.html'">🤖 Chatbot öffnen</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="messageContainer"></div>
+
+        <div class="dashboard-grid">
+            <div class="card stat-card">
+                <div class="stat-number" id="fileCount">0</div>
+                <div class="stat-label">Fragen/Dateien</div>
+            </div>
+            <div class="card stat-card">
+                <div class="stat-number" id="folderCount">0</div>
+                <div class="stat-label">Ordner</div>
+            </div>
+            <div class="card stat-card">
+                <div class="stat-number" id="variableCount">0</div>
+                <div class="stat-label">Variablen</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📤 Dialog-Struktur importieren</h2>
+            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('zipInput').click()">
+                <div class="upload-icon">📦</div>
+                <p>ZIP-Datei hier ablegen oder klicken zum Auswählen</p>
+                <p style="font-size: 12px; color: var(--admin-text-muted); margin-top: 8px;">Unterstützt beide Formate: Alte Syntax und Enhanced Syntax</p>
+            </div>
+            <input type="file" id="zipInput" class="file-input" accept=".zip">
+            <div style="display: flex; gap: var(--spacing-sm);">
+                <button class="btn btn-secondary" onclick="admin.loadFromStorage()">💾 Aus LocalStorage laden</button>
+                <button class="btn btn-secondary" onclick="admin.clearStorage()">🗑️ Storage leeren</button>
+            </div>
+        </div>
+
+        <div class="action-grid" style="margin-top: var(--spacing-lg);">
+            <div class="action-card" onclick="admin.exportZip()">
+                <div class="action-icon">📦</div>
+                <div class="action-title">ZIP exportieren</div>
+                <div class="action-desc">Aktuelle Struktur herunterladen</div>
+            </div>
+            <div class="action-card" onclick="admin.deployToChatbot()">
+                <div class="action-icon">🚀</div>
+                <div class="action-title">Zu Chatbot deployen</div>
+                <div class="action-desc">Struktur für Chatbot bereitstellen</div>
+            </div>
+            <div class="action-card" onclick="admin.validateStructure()">
+                <div class="action-icon">✅</div>
+                <div class="action-title">Struktur validieren</div>
+                <div class="action-desc">Auf Fehler prüfen</div>
+            </div>
+            <div class="action-card" onclick="admin.showVariables()">
+                <div class="action-icon">🔤</div>
+                <div class="action-title">Variablen anzeigen</div>
+                <div class="action-desc">Alle definierten Variablen</div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: var(--spacing-lg);">
+            <h2>📁 Dialog-Struktur</h2>
+            <div class="structure-tree" id="structureTree">
+                <p style="color: var(--admin-text-muted); text-align: center; padding: var(--spacing-lg);">Keine Struktur geladen. Bitte ZIP-Datei importieren.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <div class="status-indicator">
+            <div class="status-dot"></div>
+            <span id="statusText">Bereit</span>
+        </div>
+        <div>
+            <span id="lastUpdate">Noch keine Struktur geladen</span>
+        </div>
+    </div>
+
+    <script>
+        class AdminDashboard {
+            constructor() { this.structure = null; this.init(); }
+            init() {
+                if (window.RechtCleverLogo) { RechtCleverLogo.render('logoContainer', 'small'); }
+                this.setupDragAndDrop(); this.attachEventListeners(); this.loadFromStorage();
+            }
+            setupDragAndDrop() {
+                const zone = document.getElementById('uploadZone');
+                zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+                zone.addEventListener('dragleave', () => { zone.classList.remove('dragover'); });
+                zone.addEventListener('drop', (e) => { e.preventDefault(); zone.classList.remove('dragover'); const files = e.dataTransfer.files; if (files.length > 0 && files[0].name.endsWith('.zip')) { this.handleZipImport(files[0]); } });
+            }
+            attachEventListeners() { document.getElementById('zipInput').addEventListener('change', (e) => { if (e.target.files.length > 0) { this.handleZipImport(e.target.files[0]); } }); }
+            async handleZipImport(file) {
+                try {
+                    this.showMessage('ZIP wird importiert...', 'info');
+                    const structure = await ZipProcessor.parseZip(file);
+                    this.structure = structure; DialogStorage.save(structure);
+                    this.updateStats(); this.renderTree(); this.showMessage('✅ ZIP erfolgreich importiert und gespeichert!', 'success'); this.updateLastUpdate();
+                } catch (error) { console.error('Import error:', error); this.showMessage('❌ Fehler beim Importieren der ZIP-Datei', 'error'); }
+            }
+            loadFromStorage() { const structure = DialogStorage.load(); if (structure) { this.structure = structure; this.updateStats(); this.renderTree(); this.showMessage('✅ Struktur aus LocalStorage geladen', 'success'); this.updateLastUpdate(); } else { this.showMessage('Keine gespeicherte Struktur gefunden', 'info'); } }
+            clearStorage() {
+                if (confirm('Möchten Sie die gespeicherte Struktur wirklich löschen?')) { DialogStorage.save(null); DialogStorage.saveZip(null); this.structure = null; this.updateStats(); document.getElementById('structureTree').innerHTML = '<p style="color: var(--admin-text-muted); text-align: center; padding: var(--spacing-lg);">Keine Struktur geladen.</p>'; this.showMessage('🗑️ Storage geleert', 'success'); }
+            }
+            updateStats() {
+                if (!this.structure) { document.getElementById('fileCount').textContent = '0'; document.getElementById('folderCount').textContent = '0'; document.getElementById('variableCount').textContent = '0'; return; }
+                let files = 0, folders = 0, variables = new Set();
+                const countItems = (node) => { if (node.type === 'folder') { folders++; } else if (node.type === 'file') { files++; if (node.content) { (node.content.match(/\$[a-zA-Z0-9_]+\$/g) || []).forEach(v => variables.add(v)); } } if (node.children) { node.children.forEach(countItems); } };
+                if (this.structure.children) { this.structure.children.forEach(countItems); }
+                document.getElementById('fileCount').textContent = files; document.getElementById('folderCount').textContent = folders; document.getElementById('variableCount').textContent = variables.size;
+            }
+            renderTree() {
+                const container = document.getElementById('structureTree');
+                if (!this.structure || !this.structure.children || this.structure.children.length === 0) { container.innerHTML = '<p style="color: var(--admin-text-muted); text-align: center; padding: var(--spacing-lg);">Keine Struktur geladen.</p>'; return; }
+                container.innerHTML = ''; this.structure.children.forEach(child => { this.renderTreeNode(child, container, 0); });
+            }
+            renderTreeNode(node, container, depth) {
+                const item = document.createElement('div'); item.className = 'tree-item'; item.style.paddingLeft = `${depth * 20 + 8}px`;
+                const icon = node.type === 'folder' ? '📁' : '📄'; item.innerHTML = `<span class="tree-icon">${icon}</span><span>${node.name}</span>`;
+                container.appendChild(item); if (node.type === 'folder' && node.children) { node.children.forEach(child => { this.renderTreeNode(child, container, depth + 1); }); }
+            }
+            async exportZip() {
+                if (!this.structure) { this.showMessage('❌ Keine Struktur zum Exportieren vorhanden', 'error'); return; }
+                try { this.showMessage('ZIP wird erstellt...', 'info'); const blob = await ZipProcessor.createZip(this.structure); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'juri-dialog-struktur.zip'; a.click(); URL.revokeObjectURL(url); this.showMessage('✅ ZIP erfolgreich exportiert!', 'success'); } catch (error) { console.error('Export error:', error); this.showMessage('❌ Fehler beim Exportieren', 'error'); }
+            }
+            async deployToChatbot() {
+                if (!this.structure) { this.showMessage('❌ Keine Struktur zum Deployen vorhanden', 'error'); return; }
+                try { this.showMessage('Deploy wird vorbereitet...', 'info'); const blob = await ZipProcessor.createZip(this.structure); const reader = new FileReader(); reader.onload = () => { const base64 = String(reader.result).split(',')[1]; DialogStorage.saveZip(base64); this.showMessage('✅ Erfolgreich deployed! Chatbot nutzt jetzt die neue Struktur.', 'success'); setTimeout(() => { window.open('index.html', '_blank'); }, 1000); }; reader.readAsDataURL(blob); } catch (error) { console.error('Deploy error:', error); this.showMessage('❌ Fehler beim Deploy', 'error'); }
+            }
+            validateStructure() {
+                if (!this.structure) { this.showMessage('❌ Keine Struktur zum Validieren vorhanden', 'error'); return; }
+                const errors = []; const warnings = [];
+                const validate = (node, path = '') => {
+                    const currentPath = path ? `${path}/${node.name}` : node.name;
+                    if (!node.name) { errors.push(`${currentPath}: Kein Name definiert`); }
+                    if (node.type === 'file') {
+                        if (!node.content || node.content.trim() === '') { warnings.push(`${currentPath}: Datei ist leer`); }
+                        if (node.content) { const varMatches = node.content.match(/\$[a-zA-Z0-9_]+\$/g) || []; if (varMatches.length === 0) { warnings.push(`${currentPath}: Keine Variable definiert`); } }
+                    }
+                    if (node.type === 'folder' && node.children) { node.children.forEach(child => validate(child, currentPath)); }
+                };
+                if (this.structure.children) { this.structure.children.forEach(child => validate(child)); }
+                let message = '<div style="text-align: left;">';
+                message += `<strong>Validierung abgeschlossen</strong><br><br>`;
+                message += `📊 Gesamt: ${document.getElementById('fileCount').textContent} Dateien<br>`;
+                if (errors.length === 0 && warnings.length === 0) { message += `<br>✅ Keine Fehler oder Warnungen gefunden!`; }
+                else {
+                    if (errors.length > 0) { message += `<br>❌ <strong>${errors.length} Fehler:</strong><br>`; errors.slice(0, 5).forEach(e => message += `&nbsp;&nbsp;• ${e}<br>`); if (errors.length > 5) message += `&nbsp;&nbsp;... und ${errors.length - 5} weitere<br>`; }
+                    if (warnings.length > 0) { message += `<br>⚠️ <strong>${warnings.length} Warnungen:</strong><br>`; warnings.slice(0, 5).forEach(w => message += `&nbsp;&nbsp;• ${w}<br>`); if (warnings.length > 5) message += `&nbsp;&nbsp;... und ${warnings.length - 5} weitere<br>`; }
+                }
+                message += '</div>';
+                this.showMessage(message, errors.length > 0 ? 'error' : warnings.length > 0 ? 'warning' : 'success', 8000);
+            }
+            showVariables() {
+                if (!this.structure) { this.showMessage('❌ Keine Struktur geladen', 'error'); return; }
+                const variables = new Map();
+                const extractVars = (node, path = '') => {
+                    const currentPath = path ? `${path}/${node.name}` : node.name;
+                    if (node.type === 'file' && node.content) { const varMatches = node.content.match(/\$[a-zA-Z0-9_]+\$/g) || []; varMatches.forEach(v => { if (!variables.has(v)) { variables.set(v, []); } variables.get(v).push(currentPath); }); }
+                    if (node.type === 'folder' && node.children) { node.children.forEach(child => extractVars(child, currentPath)); }
+                };
+                if (this.structure.children) { this.structure.children.forEach(child => extractVars(child)); }
+                let message = '<div style="text-align: left; max-height: 400px; overflow-y: auto;">';
+                message += `<strong>📊 Gefundene Variablen (${variables.size})</strong><br><br>`;
+                if (variables.size === 0) { message += 'Keine Variablen gefunden.'; }
+                else { const sortedVars = Array.from(variables.entries()).sort(); sortedVars.forEach(([varName, files]) => { message += `<strong>${varName}</strong><br>`; message += `&nbsp;&nbsp;Verwendet in: ${files.join(', ')}<br><br>`; }); }
+                message += '</div>';
+                this.showMessage(message, 'info', 10000);
+            }
+            showMessage(text, type = 'info', duration = 5000) {
+                const container = document.getElementById('messageContainer'); const alert = document.createElement('div'); alert.className = `alert ${type === 'success' ? 'success' : ''}`; alert.innerHTML = text; container.innerHTML = ''; container.appendChild(alert);
+                document.getElementById('statusText').textContent = text.replace(/<[^>]*>/g, '').substring(0, 50);
+                setTimeout(() => { alert.remove(); document.getElementById('statusText').textContent = 'Bereit'; }, duration);
+            }
+            updateLastUpdate() {
+                const now = new Date(); const formatted = now.toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                document.getElementById('lastUpdate').textContent = `Zuletzt aktualisiert: ${formatted}`;
+            }
+        }
+        let admin; document.addEventListener('DOMContentLoaded', () => { admin = new AdminDashboard(); });
+    </script>
+</body>
+</html>
+
+
