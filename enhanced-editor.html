@@ -85,6 +85,9 @@
                 <button class="btn-secondary btn-sm" onclick="editor.importZip()">📂 Import</button>
             </div>
             <div class="section-header">DIALOG STRUKTUR</div>
+            <div class="breadcrumb-nav" id="breadcrumbNav" style="padding: var(--spacing-sm); border-bottom: 1px solid var(--admin-border); font-size: 12px; color: var(--admin-text-muted); display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+                <span class="breadcrumb-item" data-path="">📁 Root</span>
+            </div>
             <div class="search-bar" style="padding: var(--spacing-sm); border-bottom: 1px solid var(--admin-border);">
                 <input type="text" id="treeSearch" class="form-input" placeholder="🔍 Suche nach Datei oder Ordner..." style="width: 100%; font-size: 12px;">
                 <div class="filter-buttons" style="display: flex; gap: 4px; margin-top: 6px;">
@@ -94,6 +97,14 @@
                 </div>
             </div>
             <div class="tree-container" id="treeContainer"></div>
+            <div id="contextMenu" class="context-menu" style="display:none; position: fixed; background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); z-index: 1000; min-width: 180px; padding: 4px 0;">
+                <div class="context-item" data-action="rename" style="padding:8px 16px; cursor:pointer; font-size:13px; color:var(--admin-text);">✏️ Umbenennen</div>
+                <div class="context-item" data-action="duplicate" style="padding:8px 16px; cursor:pointer; font-size:13px; color:var(--admin-text);">📋 Duplizieren</div>
+                <div class="context-item" data-action="delete" style="padding:8px 16px; cursor:pointer; font-size:13px; color:var(--admin-text);">🗑️ Löschen</div>
+                <div class="context-divider" style="height:1px; background:var(--admin-border); margin:4px 0;"></div>
+                <div class="context-item" data-action="newFile" style="padding:8px 16px; cursor:pointer; font-size:13px; color:var(--admin-text);">➕ Neue Datei hier</div>
+                <div class="context-item" data-action="newFolder" style="padding:8px 16px; cursor:pointer; font-size:13px; color:var(--admin-text);">📁 Neuer Ordner hier</div>
+            </div>
         </div>
         <div class="editor-area">
             <div class="editor-header">
@@ -215,6 +226,7 @@
                 this.updateQuestionTypeHandlers();
                 this.setupLivePreview();
                 this.initSearch();
+                this.initContextMenu();
             }
             attachEventListeners() {
                 const zipInput = document.getElementById('zipFileInput');
@@ -285,6 +297,12 @@
                 }
 
                 nodeElement.innerHTML = inner;
+                // Context Menu (Rechtsklick)
+                nodeElement.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    this.showContextMenu(e, node);
+                });
+
                 container.appendChild(nodeElement);
 
                 if (node.type === 'folder' && hasChildren) {
@@ -294,6 +312,132 @@
                         node.children.forEach(child => this.renderTreeNode(child, container, depth + 1));
                     }
                 }
+            }
+            // Breadcrumb
+            updateBreadcrumb(node) {
+                const breadcrumb = document.getElementById('breadcrumbNav');
+                if (!breadcrumb) return;
+                const path = (node.path || '').split('/').filter(Boolean);
+                let html = '<span class="breadcrumb-item" data-path="">📁 Root</span>';
+                if (path.length > 0) {
+                    path.forEach((part, index) => {
+                        const currentPath = path.slice(0, index + 1).join('/');
+                        html += '<span class="breadcrumb-separator"> / </span>';
+                        html += `<span class="breadcrumb-item" data-path="${currentPath}">${part}</span>`;
+                    });
+                }
+                breadcrumb.innerHTML = html;
+                breadcrumb.querySelectorAll('.breadcrumb-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const targetPath = item.dataset.path || '';
+                        this.navigateToPath(targetPath);
+                    });
+                });
+            }
+            navigateToPath(path) {
+                if (!path) { this.selectNode(this.structure, document.createElement('div')); return; }
+                const node = this.findNodeByPath(this.structure, path);
+                if (node) {
+                    // expand all parts of path
+                    const parts = path.split('/').filter(Boolean);
+                    let acc = '';
+                    for (const p of parts) { acc = acc ? `${acc}/${p}` : p; this.collapsedFolders.delete(acc); }
+                    this.renderTree();
+                    // best effort: select by label
+                    const labels = Array.from(document.querySelectorAll('.tree-label'));
+                    const el = labels.find(l => (node.name && l.textContent === node.name));
+                    if (el) this.selectNode(node, el.closest('.tree-item'));
+                }
+            }
+            findNodeByPath(node, targetPath) {
+                if ((node.path || '') === targetPath) return node;
+                if (node.children) {
+                    for (const child of node.children) {
+                        const found = this.findNodeByPath(child, targetPath);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            }
+            // Context Menu
+            initContextMenu() {
+                const menu = document.getElementById('contextMenu');
+                if (!menu) return;
+                document.addEventListener('click', (e) => {
+                    if (!menu.contains(e.target)) menu.style.display = 'none';
+                });
+                menu.querySelectorAll('.context-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const action = item.dataset.action;
+                        const node = this._contextNode;
+                        menu.style.display = 'none';
+                        if (!node) return;
+                        this.handleContextAction(action, node);
+                    });
+                });
+            }
+            showContextMenu(event, node) {
+                const menu = document.getElementById('contextMenu');
+                if (!menu) return;
+                this._contextNode = node;
+                menu.style.display = 'block';
+                menu.style.left = event.clientX + 'px';
+                menu.style.top = event.clientY + 'px';
+            }
+            handleContextAction(action, node) {
+                switch(action) {
+                    case 'rename': {
+                        const newName = prompt('Neuer Name:', node.name);
+                        if (newName && newName.trim()) {
+                            node.name = newName.trim();
+                            // aktualisiere path relativ
+                            const parentPath = (node.path || '').split('/').slice(0, -1).join('/');
+                            node.path = parentPath ? `${parentPath}/${node.name}` : node.name;
+                            this.renderTree(); this.saveStructure();
+                        }
+                        break;
+                    }
+                    case 'duplicate': {
+                        const parent = this.findParentOf(this.structure, node) || this.structure;
+                        const copy = JSON.parse(JSON.stringify(node));
+                        copy.name = `${node.name} - Kopie`;
+                        copy.path = parent.path ? `${parent.path}/${copy.name}` : copy.name;
+                        (parent.children = parent.children || []).push(copy);
+                        this.renderTree(); this.saveStructure();
+                        break;
+                    }
+                    case 'delete': {
+                        if (confirm(`"${node.name}" wirklich löschen?`)) {
+                            this.removeItemFromStructure(node);
+                            this.renderTree(); this.saveStructure();
+                        }
+                        break;
+                    }
+                    case 'newFile': {
+                        const parent = node.type === 'folder' ? node : (this.findParentOf(this.structure, node) || this.structure);
+                        const f = { name: `neue-datei-${Date.now()}.txt`, type: 'file', content: '', path: parent.path ? `${parent.path}/neue-datei-${Date.now()}.txt` : `neue-datei-${Date.now()}.txt` };
+                        (parent.children = parent.children || []).push(f);
+                        this.renderTree(); this.saveStructure();
+                        break;
+                    }
+                    case 'newFolder': {
+                        const parent = node.type === 'folder' ? node : (this.findParentOf(this.structure, node) || this.structure);
+                        const id = Date.now();
+                        const folder = { name: `ordner-${id}`, type: 'folder', children: [], path: parent.path ? `${parent.path}/ordner-${id}` : `ordner-${id}` };
+                        (parent.children = parent.children || []).push(folder);
+                        this.renderTree(); this.saveStructure();
+                        break;
+                    }
+                }
+            }
+            findParentOf(root, target) {
+                if (!root || !root.children) return null;
+                if (root.children.includes(target)) return root;
+                for (const child of root.children) {
+                    const found = this.findParentOf(child, target);
+                    if (found) return found;
+                }
+                return null;
             }
             initSearch() {
                 const searchInput = document.getElementById('treeSearch');
