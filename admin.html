@@ -237,7 +237,47 @@
                     this.updateStats(); this.renderTree(); this.showMessage('✅ ZIP erfolgreich importiert und gespeichert!', 'success'); this.updateLastUpdate();
                 } catch (error) { console.error('Import error:', error); this.showMessage('❌ Fehler beim Importieren der ZIP-Datei', 'error'); }
             }
-            loadFromStorage() { const structure = DialogStorage.load(); if (structure) { this.structure = structure; this.updateStats(); this.renderTree(); this.showMessage('✅ Struktur aus LocalStorage geladen', 'success'); this.updateLastUpdate(); } else { this.showMessage('Keine gespeicherte Struktur gefunden', 'info'); } }
+            async loadFromStorage() {
+                try {
+                    // Prefer structured JSON if available
+                    const structure = DialogStorage && DialogStorage.load ? DialogStorage.load() : null;
+                    if (structure) {
+                        this.structure = structure;
+                        this.updateStats();
+                        this.renderTree();
+                        this.showMessage('✅ Struktur aus LocalStorage geladen', 'success');
+                        this.updateLastUpdate();
+                        return;
+                    }
+
+                    // Fallback: check for a saved ZIP (base64) — used by Deploy in the editor/chat
+                    const zipBase64 = DialogStorage && DialogStorage.loadZip ? DialogStorage.loadZip() : null;
+                    if (zipBase64) {
+                        try {
+                            const bytes = atob(zipBase64);
+                            const arr = new Uint8Array(bytes.length);
+                            for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+                            const blob = new Blob([arr], { type: 'application/zip' });
+                            const parsed = await ZipProcessor.parseZip(blob);
+                            this.structure = parsed;
+                            // also persist parsed JSON for admin/editor convenience
+                            DialogStorage.save(parsed);
+                            this.updateStats();
+                            this.renderTree();
+                            this.showMessage('✅ Struktur aus gespeichertem ZIP geladen', 'success');
+                            this.updateLastUpdate();
+                            return;
+                        } catch (err) {
+                            console.error('Fehler beim Parsen des gespeicherten ZIP:', err);
+                        }
+                    }
+
+                    this.showMessage('Keine gespeicherte Struktur gefunden', 'info');
+                } catch (e) {
+                    console.error('loadFromStorage error', e);
+                    this.showMessage('Fehler beim Laden der Struktur', 'error');
+                }
+            }
             clearStorage() {
                 if (confirm('Möchten Sie die gespeicherte Struktur wirklich löschen?')) { DialogStorage.save(null); DialogStorage.saveZip(null); this.structure = null; this.updateStats(); document.getElementById('structureTree').innerHTML = '<p style="color: var(--admin-text-muted); text-align: center; padding: var(--spacing-lg);">Keine Struktur geladen.</p>'; this.showMessage('🗑️ Storage geleert', 'success'); }
             }
