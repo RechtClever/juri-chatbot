@@ -33,15 +33,28 @@ class EnhancedDialogParser {
     executeScript(script, variables) {
         const context = { ...variables };
         let gotoTarget = null;
-        const api = {
-            get: (k) => context[k],
-            set: (k, v) => { context[k] = v; },
-            goto: (id) => { gotoTarget = id; }
-        };
-        try {
-            const fn = new Function('api', 'vars', `with(vars){ ${script} }`);
-            fn(api, context);
-        } catch (e) { console.warn('Script error:', e); }
+
+        const lines = String(script || '').split('\n');
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+
+            // goto $ziel$
+            if (trimmed.startsWith('goto ')) {
+                gotoTarget = trimmed.substring(5).trim().replace(/\$/g, '');
+                continue;
+            }
+
+            // #variable = "wert" oder '#variable = 'wert''
+            const assignMatch = trimmed.match(/^#(\w+)\s*=\s*['"](.+)['"]$/);
+            if (assignMatch) {
+                const varName = assignMatch[1];
+                const value = assignMatch[2];
+                context[varName] = value;
+                continue;
+            }
+        }
+
         return { goto: gotoTarget, variables: context };
     }
     generateDocument(template, variables) {
