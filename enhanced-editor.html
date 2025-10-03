@@ -1043,6 +1043,28 @@ Ich entwickle einen Chatbot für rechtliche Beratung im Mietrecht, speziell für
             window.editor = editor;
             if (editor && typeof editor.attachClaudeUI === 'function') editor.attachClaudeUI();
         });
+
+        // Listen for parent requests (iframe integration)
+        window.addEventListener('message', (ev) => {
+            try {
+                const msg = ev.data || {};
+                if (msg && msg.type === 'REFRESH_STRUCTURE') {
+                    if (window.editor && typeof window.editor.loadStructureFromStorage === 'function') {
+                        window.editor.loadStructureFromStorage();
+                    } else if (window.editor) {
+                        // best-effort: re-render using saved structure
+                        const s = DialogStorage && DialogStorage.load && DialogStorage.load();
+                        if (s) { window.editor.structure = s; window.editor.renderTree(); window.editor.updateStats(); }
+                    }
+                }
+            } catch (e) { /* ignore */ }
+        });
+
+        // Expose method for parent to call directly
+        window.refreshEditorStructure = function() {
+            if (window.editor && typeof window.editor.loadStructureFromStorage === 'function') return window.editor.loadStructureFromStorage();
+            const s = DialogStorage && DialogStorage.load && DialogStorage.load(); if (s && window.editor) { window.editor.structure = s; window.editor.renderTree(); window.editor.updateStats(); }
+        };
     </script>
 </body>
 </html>

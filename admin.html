@@ -75,7 +75,6 @@
         </div>
         <div class="header-actions">
             <button class="btn btn-secondary" onclick="window.location.href='editor.html'">📝 Standard Editor</button>
-            <button class="btn btn-secondary" onclick="window.location.href='enhanced-editor.html'">✨ Enhanced Editor</button>
             <button class="btn" onclick="window.location.href='index.html'">🤖 Chatbot öffnen</button>
         </div>
     </div>
@@ -137,8 +136,13 @@
 
         <div class="card" style="margin-top: var(--spacing-lg);">
             <h2>📁 Dialog-Struktur</h2>
-            <div class="structure-tree" id="structureTree">
-                <p style="color: var(--admin-text-muted); text-align: center; padding: var(--spacing-lg);">Keine Struktur geladen. Bitte ZIP-Datei importieren.</p>
+            <!-- Embedded Enhanced Editor -->
+            <div style="height: 720px; border: 1px solid var(--admin-border); border-radius: var(--radius-md); overflow: hidden;">
+                <iframe id="editorIframe" src="enhanced-editor.html" style="width:100%; height:100%; border:0;" title="Enhanced Editor"></iframe>
+            </div>
+            <div style="margin-top:12px; display:flex; gap:8px;">
+                <button class="btn btn-secondary" onclick="admin.openEditorPopup()">🔗 Editor in neuem Tab öffnen</button>
+                <button class="btn" onclick="admin.refreshEditor()">🔄 Editor neu laden</button>
             </div>
         </div>
     </div>
@@ -252,6 +256,20 @@
             updateLastUpdate() {
                 const now = new Date(); const formatted = now.toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
                 document.getElementById('lastUpdate').textContent = `Zuletzt aktualisiert: ${formatted}`;
+            }
+            // Open embedded editor in a new tab
+            openEditorPopup() {
+                window.open('enhanced-editor.html', '_blank');
+            }
+            // Refresh editor iframe: try postMessage first, else reload iframe
+            refreshEditor() {
+                const iframe = document.getElementById('editorIframe');
+                if (!iframe) return;
+                try {
+                    iframe.contentWindow && iframe.contentWindow.postMessage({ type: 'REFRESH_STRUCTURE' }, '*');
+                } catch (_) {
+                    iframe.src = iframe.src; // fallback: reload iframe
+                }
             }
         }
         let admin; document.addEventListener('DOMContentLoaded', () => { admin = new AdminDashboard(); });
