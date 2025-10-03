@@ -47,6 +47,13 @@
         .tree-item.selected { background: var(--primary-color); color: white; }
         .tree-item.file { margin-left: 16px; opacity: 0.9; }
         .tree-icon { width: 16px; text-align: center; }
+        .tree-chevron { user-select: none; font-size: 10px; color: var(--admin-text-muted); transition: transform 0.2s ease; width: 16px; display: inline-block; cursor: pointer; }
+        .tree-item:hover .tree-chevron { color: var(--primary-color); }
+        .filter-btn { flex: 1; padding: 4px 8px; font-size: 11px; background: var(--admin-bg); border: 1px solid var(--admin-border); color: var(--admin-text); border-radius: var(--radius-sm); cursor: pointer; transition: var(--transition-fast); }
+        .filter-btn:hover { border-color: var(--primary-color); }
+        .filter-btn.active { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+        .tree-item.hidden { display: none; }
+        .tree-item.search-match { background: rgba(91, 75, 160, 0.1); }
         .properties-panel { width: 280px; background: var(--admin-surface); border-left: 1px solid var(--admin-border); padding: var(--spacing-md); overflow-y: auto; }
         .properties-panel h3 { margin-bottom: var(--spacing-md); }
         .toolbar { padding: var(--spacing-sm); border-bottom: 1px solid var(--admin-border); display: flex; gap: var(--spacing-xs); flex-wrap: wrap; }
@@ -78,6 +85,14 @@
                 <button class="btn-secondary btn-sm" onclick="editor.importZip()">📂 Import</button>
             </div>
             <div class="section-header">DIALOG STRUKTUR</div>
+            <div class="search-bar" style="padding: var(--spacing-sm); border-bottom: 1px solid var(--admin-border);">
+                <input type="text" id="treeSearch" class="form-input" placeholder="🔍 Suche nach Datei oder Ordner..." style="width: 100%; font-size: 12px;">
+                <div class="filter-buttons" style="display: flex; gap: 4px; margin-top: 6px;">
+                    <button class="filter-btn active" data-filter="all" type="button">Alle</button>
+                    <button class="filter-btn" data-filter="folder" type="button">Ordner</button>
+                    <button class="filter-btn" data-filter="file" type="button">Dateien</button>
+                </div>
+            </div>
             <div class="tree-container" id="treeContainer"></div>
         </div>
         <div class="editor-area">
@@ -186,6 +201,9 @@
                 this.structure = this.loadStructure() || this.createEmptyStructure();
                 this.currentFile = null;
                 this.selectedItem = null;
+                this.collapsedFolders = new Set();
+                this.searchTerm = '';
+                this.currentFilter = 'all';
                 this.init();
             }
             init() {
@@ -196,6 +214,7 @@
                 this.renderTree();
                 this.updateQuestionTypeHandlers();
                 this.setupLivePreview();
+                this.initSearch();
             }
             attachEventListeners() {
                 const zipInput = document.getElementById('zipFileInput');
@@ -235,16 +254,90 @@
                 container.innerHTML = '';
                 if (this.structure.children) this.structure.children.forEach(child => this.renderTreeNode(child, container, 0));
                 this.updateItemCount();
+                this.applyFilters();
             }
             renderTreeNode(node, container, depth) {
                 const nodeElement = document.createElement('div');
                 nodeElement.className = `tree-item ${node.type}`;
                 nodeElement.style.paddingLeft = `${depth * 16 + 8}px`;
-                const icon = node.type === 'folder' ? '📁' : '❓';
-                nodeElement.innerHTML = `<span class="tree-icon">${icon}</span><span class="tree-label">${node.name}</span>`;
-                nodeElement.addEventListener('click', () => this.selectNode(node, nodeElement));
+
+                const hasChildren = node.type === 'folder' && node.children && node.children.length > 0;
+                let inner = '';
+                if (node.type === 'folder') {
+                    const key = node.path || node.name;
+                    const isCollapsed = this.collapsedFolders.has(key);
+                    const chevron = hasChildren ? (isCollapsed ? '▶' : '▼') : '';
+                    inner = `<span class="tree-icon"><span class="tree-chevron">${chevron}</span>📁</span><span class="tree-label">${node.name}</span>`;
+
+                    nodeElement.addEventListener('click', (e) => {
+                        const target = e.target;
+                        if (target.classList.contains('tree-chevron')) {
+                            e.stopPropagation();
+                            if (this.collapsedFolders.has(key)) this.collapsedFolders.delete(key); else this.collapsedFolders.add(key);
+                            this.renderTree();
+                        } else {
+                            this.selectNode(node, nodeElement);
+                        }
+                    });
+                } else {
+                    inner = `<span class="tree-icon"><span style="width:16px; display:inline-block;"></span>❓</span><span class="tree-label">${node.name}</span>`;
+                    nodeElement.addEventListener('click', () => this.selectNode(node, nodeElement));
+                }
+
+                nodeElement.innerHTML = inner;
                 container.appendChild(nodeElement);
-                if (node.type === 'folder' && node.children) node.children.forEach(child => this.renderTreeNode(child, container, depth + 1));
+
+                if (node.type === 'folder' && hasChildren) {
+                    const key = node.path || node.name;
+                    const isCollapsed = this.collapsedFolders.has(key);
+                    if (!isCollapsed) {
+                        node.children.forEach(child => this.renderTreeNode(child, container, depth + 1));
+                    }
+                }
+            }
+            initSearch() {
+                const searchInput = document.getElementById('treeSearch');
+                if (searchInput) {
+                    searchInput.addEventListener('input', (e) => {
+                        this.searchTerm = (e.target.value || '').toLowerCase();
+                        this.applyFilters();
+                    });
+                }
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                        e.currentTarget.classList.add('active');
+                        this.currentFilter = e.currentTarget.dataset.filter || 'all';
+                        this.applyFilters();
+                    });
+                });
+            }
+            applyFilters() {
+                const allItems = document.querySelectorAll('.tree-item');
+                allItems.forEach(item => {
+                    const label = item.querySelector('.tree-label')?.textContent.toLowerCase() || '';
+                    const isFolder = item.classList.contains('folder');
+                    const isFile = item.classList.contains('file');
+                    let typeMatch = true;
+                    if (this.currentFilter === 'folder' && !isFolder) typeMatch = false;
+                    if (this.currentFilter === 'file' && !isFile) typeMatch = false;
+                    const searchMatch = !this.searchTerm || label.includes(this.searchTerm);
+                    if (typeMatch && searchMatch) {
+                        item.classList.remove('hidden');
+                        if (this.searchTerm) item.classList.add('search-match'); else item.classList.remove('search-match');
+                    } else {
+                        item.classList.add('hidden');
+                        item.classList.remove('search-match');
+                    }
+                });
+                if (this.searchTerm) {
+                    this.collapsedFolders.clear();
+                    // Re-render to ensure expanded state for search
+                    const container = document.getElementById('treeContainer');
+                    if (container && container.childElementCount > 0) {
+                        // no-op; renderTree already called after structure changes
+                    }
+                }
             }
             selectNode(node, element) {
                 document.querySelectorAll('.tree-item.selected').forEach(item => item.classList.remove('selected'));
