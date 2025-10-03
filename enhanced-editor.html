@@ -402,14 +402,39 @@ Ich entwickle einen Chatbot für rechtliche Beratung im Mietrecht, speziell für
                 }
             }
             getFileType(node, depth, parent) {
+                // Improved heuristics based on directory depth and naming rules from the dev-docs.
+                // Inputs: node (file node), parent (optional known parent node)
                 if (node.type !== 'file') return null;
-                if (parent && parent.type === 'folder') {
-                    // Check if parent folder is an answer folder (short names like "ja", "nein", etc.)
-                    const parentName = parent.name.toLowerCase();
-                    const isAnswerFolder = parentName.length <= 10 && !parentName.includes(' ') && !parentName.match(/^\d/);
-                    return isAnswerFolder ? 'answer' : 'question';
+
+                // helper: find parent and grandparent
+                const parentNode = parent || this.findParentOf(this.structure, node);
+                const grandParent = parentNode ? this.findParentOf(this.structure, parentNode) : null;
+
+                // 1) If parent is a file, this is an answer (file nested under a file)
+                if (parentNode && parentNode.type === 'file') return 'answer';
+
+                // 2) If parent folder is directly under a folder named "weiter", treat files inside parent as questions
+                if (grandParent && typeof grandParent.name === 'string' && grandParent.name.toLowerCase() === 'weiter') return 'question';
+
+                // 3) If parent folder name starts with a two-digit index (e.g. "01 Something"), it's a question folder
+                if (parentNode && typeof parentNode.name === 'string' && parentNode.name.match(/^\s*\d{2}\b/)) return 'question';
+
+                // 4) Explicit answer-folder names (common short names)
+                const answerNames = new Set(['ja','nein','yes','no','option','antwort','answer','ok','weiter']);
+                if (parentNode && typeof parentNode.name === 'string') {
+                    const pn = parentNode.name.toLowerCase();
+                    // matches option1/option2 etc.
+                    if (/^option\d+/i.test(pn) || /^antwort/i.test(pn)) return 'answer';
+                    if (answerNames.has(pn)) return 'answer';
                 }
-                if (parent && parent.type === 'file') return 'answer';
+
+                // 5) Fallback heuristic: short single-word folder names (no spaces, no leading digits) often are answer folders
+                if (parentNode && typeof parentNode.name === 'string') {
+                    const pn = parentNode.name;
+                    if (pn.length <= 10 && !pn.includes(' ') && !pn.match(/^\d/)) return 'answer';
+                }
+
+                // Default to question to be conservative
                 return 'question';
             }
             toggleFolder(folderNode) {
@@ -618,16 +643,23 @@ Ich entwickle einen Chatbot für rechtliche Beratung im Mietrecht, speziell für
                 this.updateLivePreview();
             }
             determineFileType(file) {
-                // Use actual parent node to determine type to keep parity with tree rendering
+                // Mirror the improved logic from getFileType but using explicit parents found in the structure
                 const parent = this.findParentOf(this.structure, file);
+                const grandParent = parent ? this.findParentOf(this.structure, parent) : null;
+
                 if (!parent) return 'question';
-                if (parent.type === 'folder') {
-                    // Check if parent folder is an answer folder (short names like "ja", "nein", etc.)
-                    const parentName = parent.name.toLowerCase();
-                    const isAnswerFolder = parentName.length <= 10 && !parentName.includes(' ') && !parentName.match(/^\d/);
-                    return isAnswerFolder ? 'answer' : 'question';
-                }
                 if (parent.type === 'file') return 'answer';
+
+                if (grandParent && typeof grandParent.name === 'string' && grandParent.name.toLowerCase() === 'weiter') return 'question';
+                if (parent.name && parent.name.match(/^\s*\d{2}\b/)) return 'question';
+
+                const pn = parent.name ? parent.name.toLowerCase() : '';
+                if (/^option\d+/i.test(pn) || /^antwort/i.test(pn)) return 'answer';
+                const answerNames = new Set(['ja','nein','yes','no','option','antwort','answer','ok','weiter']);
+                if (answerNames.has(pn)) return 'answer';
+
+                if (parent.name && parent.name.length <= 10 && !parent.name.includes(' ') && !parent.name.match(/^\d/)) return 'answer';
+
                 return 'question';
             }
             showQuestionEditor(content) {
