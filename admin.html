@@ -53,6 +53,13 @@
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--secondary-color); }
         .alert { background: rgba(249, 61, 37, 0.1); border: 1px solid var(--juri-red); border-radius: var(--radius-sm); padding: var(--spacing-md); margin-bottom: var(--spacing-md); color: var(--juri-red); }
         .success { background: rgba(46, 158, 91, 0.1); border-color: var(--secondary-color); color: var(--secondary-color); }
+        /* Feature tiles */
+        .feature-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--spacing-md); margin: var(--spacing-lg) 0; }
+        .feature-tile { background: var(--admin-surface-light); border: 1px solid var(--admin-border); border-radius: var(--radius-md); padding: var(--spacing-md); text-align: center; cursor: pointer; transition: transform 0.12s ease, border-color 0.12s ease; }
+        .feature-tile:hover { transform: translateY(-4px); border-color: var(--primary-color); }
+        .feature-tile .ft-icon { font-size: 24px; display: block; margin-bottom: 8px; }
+        .feature-tile .ft-title { font-weight: 700; color: var(--primary-color); }
+        .feature-hidden { display: none; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="assets/js/components/rechtCleverLogo.js"></script>
@@ -82,6 +89,30 @@
     <div class="container">
         <div id="messageContainer"></div>
 
+        <!-- Feature tiles: click to reveal sections below -->
+        <div class="feature-tiles" id="featureTiles">
+            <div class="feature-tile" onclick="admin.toggleFeature('importSection')">
+                <div class="ft-icon">📤</div>
+                <div class="ft-title">Import</div>
+                <div class="ft-desc" style="font-size:12px;color:var(--admin-text-muted);">ZIP hochladen / Storage</div>
+            </div>
+            <div class="feature-tile" onclick="admin.toggleFeature('actionsSection')">
+                <div class="ft-icon">⚙️</div>
+                <div class="ft-title">Aktionen</div>
+                <div class="ft-desc" style="font-size:12px;color:var(--admin-text-muted);">Export, Deploy, Validierung</div>
+            </div>
+            <div class="feature-tile" onclick="admin.toggleFeature('structureSection')">
+                <div class="ft-icon">📁</div>
+                <div class="ft-title">Struktur / Editor</div>
+                <div class="ft-desc" style="font-size:12px;color:var(--admin-text-muted);">Struktur anzeigen / Editor öffnen</div>
+            </div>
+            <div class="feature-tile" onclick="admin.toggleFeature('variablesSection')">
+                <div class="ft-icon">🔤</div>
+                <div class="ft-title">Variablen</div>
+                <div class="ft-desc" style="font-size:12px;color:var(--admin-text-muted);">Alle Variablen anzeigen</div>
+            </div>
+        </div>
+
         <div class="dashboard-grid">
             <div class="card stat-card">
                 <div class="stat-number" id="fileCount">0</div>
@@ -97,7 +128,7 @@
             </div>
         </div>
 
-        <div class="card">
+        <div class="card feature-hidden" id="importSection">
             <h2>📤 Dialog-Struktur importieren</h2>
             <div class="upload-zone" id="uploadZone" onclick="document.getElementById('zipInput').click()">
                 <div class="upload-icon">📦</div>
@@ -111,30 +142,32 @@
             </div>
         </div>
 
-        <div class="action-grid" style="margin-top: var(--spacing-lg);">
-            <div class="action-card" onclick="admin.exportZip()">
-                <div class="action-icon">📦</div>
-                <div class="action-title">ZIP exportieren</div>
-                <div class="action-desc">Aktuelle Struktur herunterladen</div>
-            </div>
-            <div class="action-card" onclick="admin.deployToChatbot()">
-                <div class="action-icon">🚀</div>
-                <div class="action-title">Zu Chatbot deployen</div>
-                <div class="action-desc">Struktur für Chatbot bereitstellen</div>
-            </div>
-            <div class="action-card" onclick="admin.validateStructure()">
-                <div class="action-icon">✅</div>
-                <div class="action-title">Struktur validieren</div>
-                <div class="action-desc">Auf Fehler prüfen</div>
-            </div>
-            <div class="action-card" onclick="admin.showVariables()">
-                <div class="action-icon">🔤</div>
-                <div class="action-title">Variablen anzeigen</div>
-                <div class="action-desc">Alle definierten Variablen</div>
+        <div class="card feature-hidden" id="actionsSection" style="margin-top: var(--spacing-lg);">
+            <div class="action-grid">
+                <div class="action-card" onclick="admin.exportZip()">
+                    <div class="action-icon">📦</div>
+                    <div class="action-title">ZIP exportieren</div>
+                    <div class="action-desc">Aktuelle Struktur herunterladen</div>
+                </div>
+                <div class="action-card" onclick="admin.deployToChatbot()">
+                    <div class="action-icon">🚀</div>
+                    <div class="action-title">Zu Chatbot deployen</div>
+                    <div class="action-desc">Struktur für Chatbot bereitstellen</div>
+                </div>
+                <div class="action-card" onclick="admin.validateStructure()">
+                    <div class="action-icon">✅</div>
+                    <div class="action-title">Struktur validieren</div>
+                    <div class="action-desc">Auf Fehler prüfen</div>
+                </div>
+                <div class="action-card" onclick="admin.showVariables()">
+                    <div class="action-icon">🔤</div>
+                    <div class="action-title">Variablen anzeigen</div>
+                    <div class="action-desc">Alle definierten Variablen</div>
+                </div>
             </div>
         </div>
 
-        <div class="card" style="margin-top: var(--spacing-lg);">
+        <div class="card feature-hidden" id="structureSection" style="margin-top: var(--spacing-lg);">
             <h2>📁 Dialog-Struktur</h2>
             <!-- Embedded Enhanced Editor -->
             <div style="height: 720px; border: 1px solid var(--admin-border); border-radius: var(--radius-md); overflow: hidden;">
@@ -144,6 +177,16 @@
                 <button class="btn btn-secondary" onclick="admin.openEditorPopup()">🔗 Editor in neuem Tab öffnen</button>
                 <button class="btn" onclick="admin.refreshEditor()">🔄 Editor neu laden</button>
             </div>
+        </div>
+
+        <div class="card feature-hidden" id="variablesSection" style="margin-top: var(--spacing-lg);">
+            <h2>🔤 Variablen</h2>
+            <p style="color: var(--admin-text-muted);">Zeigt alle in der geladenen Struktur gefundenen Variablen an.</p>
+            <div style="margin-top:12px; display:flex; gap:8px; align-items:center;">
+                <button class="btn btn-secondary" onclick="admin.showVariables()">🔎 Variablen scannen</button>
+                <button class="btn" onclick="admin.validateStructure()">✅ Struktur validieren</button>
+            </div>
+            <div id="variablesPreview" style="margin-top:12px; color: var(--admin-text); font-size: 14px;"></div>
         </div>
     </div>
 
@@ -241,12 +284,39 @@
                     if (node.type === 'folder' && node.children) { node.children.forEach(child => extractVars(child, currentPath)); }
                 };
                 if (this.structure.children) { this.structure.children.forEach(child => extractVars(child)); }
-                let message = '<div style="text-align: left; max-height: 400px; overflow-y: auto;">';
-                message += `<strong>📊 Gefundene Variablen (${variables.size})</strong><br><br>`;
-                if (variables.size === 0) { message += 'Keine Variablen gefunden.'; }
-                else { const sortedVars = Array.from(variables.entries()).sort(); sortedVars.forEach(([varName, files]) => { message += `<strong>${varName}</strong><br>`; message += `&nbsp;&nbsp;Verwendet in: ${files.join(', ')}<br><br>`; }); }
-                message += '</div>';
-                this.showMessage(message, 'info', 10000);
+                // Render into variablesPreview if available, else fallback to message overlay
+                const preview = document.getElementById('variablesPreview');
+                if (preview) {
+                    if (variables.size === 0) { preview.innerHTML = '<em style="color:var(--admin-text-muted);">Keine Variablen gefunden.</em>'; }
+                    else {
+                        let html = '<div style="text-align:left; max-height: 420px; overflow-y:auto;">';
+                        html += `<strong>📊 Gefundene Variablen (${variables.size})</strong><br><br>`;
+                        const sortedVars = Array.from(variables.entries()).sort();
+                        sortedVars.forEach(([varName, files]) => { html += `<strong>${varName}</strong><br>`; html += `&nbsp;&nbsp;Verwendet in: ${files.join(', ')}<br><br>`; });
+                        html += '</div>';
+                        preview.innerHTML = html;
+                    }
+                } else {
+                    let message = '<div style="text-align: left; max-height: 400px; overflow-y: auto;">';
+                    message += `<strong>📊 Gefundene Variablen (${variables.size})</strong><br><br>`;
+                    if (variables.size === 0) { message += 'Keine Variablen gefunden.'; }
+                    else { const sortedVars = Array.from(variables.entries()).sort(); sortedVars.forEach(([varName, files]) => { message += `<strong>${varName}</strong><br>`; message += `&nbsp;&nbsp;Verwendet in: ${files.join(', ')}<br><br>`; }); }
+                    message += '</div>';
+                    this.showMessage(message, 'info', 10000);
+                }
+            }
+            // Hide all feature sections
+            hideAllFeatures() {
+                const sections = ['importSection', 'actionsSection', 'structureSection', 'variablesSection'];
+                sections.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('feature-hidden'); });
+            }
+            // Toggle a single feature section (show if hidden, hide if visible)
+            toggleFeature(id) {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const isHidden = el.classList.contains('feature-hidden');
+                this.hideAllFeatures();
+                if (isHidden) { el.classList.remove('feature-hidden'); if (id === 'structureSection') { this.refreshEditor(); } }
             }
             showMessage(text, type = 'info', duration = 5000) {
                 const container = document.getElementById('messageContainer'); const alert = document.createElement('div'); alert.className = `alert ${type === 'success' ? 'success' : ''}`; alert.innerHTML = text; container.innerHTML = ''; container.appendChild(alert);
