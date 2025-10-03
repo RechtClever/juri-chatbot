@@ -591,10 +591,12 @@
                 this.updateLivePreview();
             }
             determineFileType(file) {
-                if (file.children && file.children.length > 0) return 'question';
-                const depth = (file.path || '').split('/').length;
-                if (depth <= 1) return 'question';
-                return 'answer';
+                // Use actual parent node to determine type to keep parity with tree rendering
+                const parent = this.findParentOf(this.structure, file);
+                if (!parent) return 'question';
+                if (parent.type === 'folder') return 'question';
+                if (parent.type === 'file') return 'answer';
+                return 'question';
             }
             showQuestionEditor(content) {
                 const formEditor = document.getElementById('formEditor');
