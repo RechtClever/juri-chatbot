@@ -54,6 +54,42 @@
         .filter-btn.active { background: var(--primary-color); color: white; border-color: var(--primary-color); }
         .tree-item.hidden { display: none; }
         .tree-item.search-match { background: rgba(91, 75, 160, 0.1); }
+        /* Tree Item Base */
+        .tree-item { padding: 8px 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: var(--radius-sm); transition: var(--transition-fast); margin-bottom: 2px; border-left: 3px solid transparent; }
+        .tree-item:hover { background: var(--admin-surface-light); }
+        .tree-item.selected { background: rgba(91, 75, 160, 0.15); border-left-color: var(--primary-color); }
+        /* Icons Container */
+        .tree-icons { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+        .tree-chevron { width: 16px; text-align: center; user-select: none; font-size: 10px; color: var(--admin-text-muted); cursor: pointer; transition: transform 0.2s ease; }
+        .tree-spacer { width: 16px; display: inline-block; }
+        /* Folder Styling */
+        .tree-item.folder { font-weight: 600; color: var(--admin-text); }
+        .tree-item.folder:hover { background: var(--admin-surface-light); }
+        .folder-icon { font-size: 16px; }
+        /* Fragen-File Styling */
+        .tree-item.file-question { background: rgba(91, 75, 160, 0.05); border-left: 3px solid rgba(91, 75, 160, 0.3); font-weight: 500; margin-top: 4px; margin-bottom: 4px; }
+        .tree-item.file-question:hover { background: rgba(91, 75, 160, 0.12); border-left-color: var(--primary-color); }
+        .tree-item.file-question.selected { background: rgba(91, 75, 160, 0.2); border-left-color: var(--primary-color); }
+        .question-icon { font-size: 18px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1)); }
+        /* Antwort-File Styling */
+        .tree-item.file-answer { background: rgba(46, 158, 91, 0.05); border-left: 3px solid rgba(46, 158, 91, 0.3); font-size: 13px; font-weight: 400; margin-left: 20px; }
+        .tree-item.file-answer:hover { background: rgba(46, 158, 91, 0.12); border-left-color: var(--secondary-color); }
+        .tree-item.file-answer.selected { background: rgba(46, 158, 91, 0.2); border-left-color: var(--secondary-color); }
+        .answer-icon { font-size: 16px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1)); }
+        /* Badges */
+        .question-badge, .answer-badge { margin-left: auto; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .question-badge { background: var(--primary-color); color: white; }
+        .answer-badge { background: var(--secondary-color); color: white; }
+        /* Tree Label */
+        .tree-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tree-item.file-question .tree-label { color: var(--primary-color); font-size: 14px; }
+        .tree-item.file-answer .tree-label { color: var(--secondary-color); font-size: 13px; }
+        /* Editor Type Indicators */
+        .editor-type-indicator { padding: 12px 16px; border-radius: var(--radius-md); font-weight: 600; font-size: 14px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+        .question-indicator { background: linear-gradient(135deg, rgba(91, 75, 160, 0.15) 0%, rgba(91, 75, 160, 0.05) 100%); border: 2px solid var(--primary-color); color: var(--primary-color); }
+        .answer-indicator { background: linear-gradient(135deg, rgba(46, 158, 91, 0.15) 0%, rgba(46, 158, 91, 0.05) 100%); border: 2px solid var(--secondary-color); color: var(--secondary-color); }
+        .info-box { background: rgba(91, 75, 160, 0.05); border-left: 4px solid var(--primary-color); padding: 12px 16px; border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 20px; color: var(--admin-text); }
+        .info-box strong { color: var(--primary-color); }
         .properties-panel { width: 280px; background: var(--admin-surface); border-left: 1px solid var(--admin-border); padding: var(--spacing-md); overflow-y: auto; }
         .properties-panel h3 { margin-bottom: var(--spacing-md); }
         .toolbar { padding: var(--spacing-sm); border-bottom: 1px solid var(--admin-border); display: flex; gap: var(--spacing-xs); flex-wrap: wrap; }
@@ -213,6 +249,7 @@
                 this.currentFile = null;
                 this.selectedItem = null;
                 this.collapsedFolders = new Set();
+                this.collapsedQuestions = new Set();
                 this.searchTerm = '';
                 this.currentFilter = 'all';
                 this.init();
@@ -268,50 +305,92 @@
                 this.updateItemCount();
                 this.applyFilters();
             }
-            renderTreeNode(node, container, depth) {
+            renderTreeNode(node, container, depth, parent = null) {
                 const nodeElement = document.createElement('div');
+                const fileType = this.getFileType(node, depth, parent);
                 nodeElement.className = `tree-item ${node.type}`;
+                if (fileType) nodeElement.classList.add(`file-${fileType}`);
                 nodeElement.style.paddingLeft = `${depth * 16 + 8}px`;
-
-                const hasChildren = node.type === 'folder' && node.children && node.children.length > 0;
-                let inner = '';
+                let icon = '';
+                let hasChildren = (node.type === 'folder' || node.type === 'file') && node.children && node.children.length > 0;
                 if (node.type === 'folder') {
-                    const key = node.path || node.name;
-                    const isCollapsed = this.collapsedFolders.has(key);
+                    const isCollapsed = this.collapsedFolders.has(node.path || node.name);
                     const chevron = hasChildren ? (isCollapsed ? '▶' : '▼') : '';
-                    inner = `<span class="tree-icon"><span class="tree-chevron">${chevron}</span>📁</span><span class="tree-label">${node.name}</span>`;
-
+                    icon = `<span class="tree-chevron">${chevron}</span><span class="folder-icon">📁</span>`;
                     nodeElement.addEventListener('click', (e) => {
-                        const target = e.target;
-                        if (target.classList.contains('tree-chevron')) {
+                        if (e.target.classList.contains('tree-chevron') || e.target.closest('.tree-chevron')) {
                             e.stopPropagation();
-                            if (this.collapsedFolders.has(key)) this.collapsedFolders.delete(key); else this.collapsedFolders.add(key);
-                            this.renderTree();
+                            this.toggleFolder(node);
                         } else {
                             this.selectNode(node, nodeElement);
                         }
                     });
+                } else if (fileType === 'question') {
+                    const isCollapsed = this.collapsedQuestions.has(node.path || node.name);
+                    const chevron = hasChildren ? (isCollapsed ? '▶' : '▼') : '';
+                    icon = `<span class="tree-chevron">${chevron}</span><span class="question-icon">❓</span>`;
+                    nodeElement.addEventListener('click', (e) => {
+                        if (e.target.classList.contains('tree-chevron') || e.target.closest('.tree-chevron')) {
+                            e.stopPropagation();
+                            this.toggleQuestion(node);
+                        } else {
+                            this.selectNode(node, nodeElement);
+                        }
+                    });
+                } else if (fileType === 'answer') {
+                    icon = '<span class="tree-spacer"></span><span class="answer-icon">💬</span>';
+                    nodeElement.addEventListener('click', () => this.selectNode(node, nodeElement));
                 } else {
-                    inner = `<span class="tree-icon"><span style="width:16px; display:inline-block;"></span>❓</span><span class="tree-label">${node.name}</span>`;
+                    icon = '<span class="tree-spacer"></span><span class="file-icon">📄</span>';
                     nodeElement.addEventListener('click', () => this.selectNode(node, nodeElement));
                 }
-
-                nodeElement.innerHTML = inner;
+                nodeElement.innerHTML = `
+                    <span class="tree-icons">${icon}</span>
+                    <span class="tree-label">${node.name}</span>
+                    ${fileType === 'question' ? '<span class="question-badge">FRAGE</span>' : ''}
+                    ${fileType === 'answer' ? '<span class="answer-badge">ANTWORT</span>' : ''}
+                `;
                 // Context Menu (Rechtsklick)
                 nodeElement.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
                     this.showContextMenu(e, node);
                 });
-
                 container.appendChild(nodeElement);
-
                 if (node.type === 'folder' && hasChildren) {
-                    const key = node.path || node.name;
-                    const isCollapsed = this.collapsedFolders.has(key);
+                    const isCollapsed = this.collapsedFolders.has(node.path || node.name);
                     if (!isCollapsed) {
-                        node.children.forEach(child => this.renderTreeNode(child, container, depth + 1));
+                        node.children.forEach(child => this.renderTreeNode(child, container, depth + 1, node));
+                    }
+                } else if (fileType === 'question' && hasChildren) {
+                    const isCollapsed = this.collapsedQuestions.has(node.path || node.name);
+                    if (!isCollapsed) {
+                        node.children.forEach(child => this.renderTreeNode(child, container, depth + 1, node));
                     }
                 }
+            }
+            getFileType(node, depth, parent) {
+                if (node.type !== 'file') return null;
+                if (parent && parent.type === 'folder') return 'question';
+                if (parent && parent.type === 'file') return 'answer';
+                return 'question';
+            }
+            toggleFolder(folderNode) {
+                const key = folderNode.path || folderNode.name;
+                if (this.collapsedFolders.has(key)) {
+                    this.collapsedFolders.delete(key);
+                } else {
+                    this.collapsedFolders.add(key);
+                }
+                this.renderTree();
+            }
+            toggleQuestion(questionNode) {
+                const key = questionNode.path || questionNode.name;
+                if (this.collapsedQuestions.has(key)) {
+                    this.collapsedQuestions.delete(key);
+                } else {
+                    this.collapsedQuestions.add(key);
+                }
+                this.renderTree();
             }
             // Breadcrumb
             updateBreadcrumb(node) {
@@ -491,30 +570,161 @@
             }
             loadFileIntoForm(file) {
                 this.currentFile = file;
+                const fileType = this.determineFileType(file);
                 if (!file.enhancedContent) file.enhancedContent = this.parseOldFormatToNew(file.content || '');
                 const content = file.enhancedContent;
-                document.getElementById('questionTitle').value = content.titel || '';
-                document.getElementById('questionSubtitle').value = content.untertitel || '';
-                document.getElementById('questionDesignator').value = content.bezeichner || '';
-                document.getElementById('questionScript').value = content.script || '';
-                document.getElementById('documentText').value = content.dokumenttext || '';
-                const typeElement = document.querySelector(`[data-type="${content.fragetyp || 'Single Select'}"]`);
-                if (typeElement) typeElement.click();
-                this.loadAnswers(content.antworten || []);
+                if (fileType === 'question') { this.showQuestionEditor(content); }
+                else if (fileType === 'answer') { this.showAnswerEditor(content); }
                 document.getElementById('fileName').value = file.name || '';
                 document.getElementById('filePath').value = file.path || '';
                 this.updateLivePreview();
             }
+            determineFileType(file) {
+                if (file.children && file.children.length > 0) return 'question';
+                const depth = (file.path || '').split('/').length;
+                if (depth <= 1) return 'question';
+                return 'answer';
+            }
+            showQuestionEditor(content) {
+                const formEditor = document.getElementById('formEditor');
+                formEditor.innerHTML = `
+                    <div class="editor-type-indicator question-indicator">❓ FRAGEN-EDITOR</div>
+                    <div class="form-section"><h3>📝 Frage</h3>
+                        <div class="form-group"><label class="form-label">Fragetext</label>
+                            <input type="text" class="form-input" id="questionTitle" placeholder="# Wie ist dein Zivilstand?" value="${content.titel || ''}">
+                        </div>
+                        <div class="form-group"><label class="form-label">Beschreibung (optional)</label>
+                            <textarea class="form-textarea" id="questionSubtitle" rows="2" placeholder="Zusätzliche Erklärung">${content.untertitel || ''}</textarea>
+                        </div>
+                        <div class="form-group"><label class="form-label">Variable (wird gespeichert als)</label>
+                            <input type="text" class="form-input" id="questionDesignator" placeholder="$Zivilstand$" value="${content.bezeichner || ''}">
+                        </div>
+                    </div>
+                    <div class="form-section"><h3>❓ Fragetyp</h3>
+                        <div class="question-types">
+                            <div class="question-type ${content.fragetyp === 'Single Select' ? 'active' : ''}" data-type="Single Select"><div class="question-type-icon">☝</div><div class="question-type-name">Single Select</div></div>
+                            <div class="question-type ${content.fragetyp === 'Multiple Choice' ? 'active' : ''}" data-type="Multiple Choice"><div class="question-type-icon">☑</div><div class="question-type-name">Multiple Choice</div></div>
+                            <div class="question-type ${content.fragetyp === 'Text' ? 'active' : ''}" data-type="Text"><div class="question-type-icon">📝</div><div class="question-type-name">Text</div></div>
+                            <div class="question-type ${content.fragetyp === 'Number' ? 'active' : ''}" data-type="Number"><div class="question-type-icon">🔢</div><div class="question-type-name">Number</div></div>
+                            <div class="question-type ${content.fragetyp === 'Currency' ? 'active' : ''}" data-type="Currency"><div class="question-type-icon">💰</div><div class="question-type-name">Currency</div></div>
+                            <div class="question-type ${content.fragetyp === 'Date' ? 'active' : ''}" data-type="Date"><div class="question-type-icon">📅</div><div class="question-type-name">Date</div></div>
+                        </div>
+                        <input type="hidden" id="questionType" value="${content.fragetyp || 'Single Select'}">
+                    </div>
+                    <div class="form-section" id="answersSection" style="display: ${['Single Select', 'Multiple Choice'].includes(content.fragetyp) ? 'block' : 'none'}">
+                        <h3>💬 Antwortmöglichkeiten</h3>
+                        <p style="font-size: 12px; color: var(--admin-text-muted); margin-bottom: 12px;">Diese Antworten werden als Buttons/Optionen angezeigt. Für jede Antwort kann eine Follow-up Frage erstellt werden.</p>
+                        <div class="dynamic-list" id="answersList"></div>
+                        <button class="add-btn" onclick="editor.addAnswer()">+ Antwort hinzufügen</button>
+                    </div>
+                    <div class="form-section"><h3>🔧 Logik & Verzweigungen (optional)</h3>
+                        <div class="form-group"><label class="form-label">Script</label>
+                            <textarea class="form-textarea" id="questionScript" rows="8" placeholder="goto $andere-frage$&#10;#variable = 'wert'">${content.script || ''}</textarea>
+                        </div>
+                    </div>
+                    <div class="form-section"><h3>📄 Dokument-Template (optional)</h3>
+                        <div class="form-group"><label class="form-label">Text für generiertes Dokument</label>
+                            <textarea class="form-textarea" id="documentText" rows="4" placeholder="Verwende [variable] für Platzhalter...">${content.dokumenttext || ''}</textarea>
+                        </div>
+                    </div>
+                `;
+                this.reattachEventListeners();
+            }
+            showAnswerEditor(content) {
+                const formEditor = document.getElementById('formEditor');
+                formEditor.innerHTML = `
+                    <div class="editor-type-indicator answer-indicator">💬 ANTWORT-EDITOR (Follow-up)</div>
+                    <div class="info-box"><strong>ℹ️ Info:</strong> Dies ist eine Antwort-Datei, die nach einer bestimmten Auswahl angezeigt wird. Antwort-Dateien sind meist einfacher und folgen direkt auf eine Frage.</div>
+                    <div class="form-section"><h3>💬 Antwort-Nachricht</h3>
+                        <div class="form-group"><label class="form-label">Titel</label>
+                            <input type="text" class="form-input" id="questionTitle" placeholder="Verstanden!" value="${content.titel || ''}">
+                        </div>
+                        <div class="form-group"><label class="form-label">Nachricht</label>
+                            <textarea class="form-textarea" id="questionSubtitle" rows="4" placeholder="Basierend auf deiner Auswahl...">${content.untertitel || ''}</textarea>
+                        </div>
+                    </div>
+                    <div class="form-section"><h3>➡️ Weiterleitung</h3>
+                        <div class="form-group"><label class="form-label">Nächste Frage (optional)</label>
+                            <input type="text" class="form-input" id="nextQuestion" placeholder="$naechste-frage$">
+                            <p style="font-size: 11px; color: var(--admin-text-muted); margin-top: 4px;">Leer lassen = Dialog endet hier</p>
+                        </div>
+                    </div>
+                    <div class="form-section"><h3>🔧 Script (optional)</h3>
+                        <div class="form-group">
+                            <textarea class="form-textarea" id="questionScript" rows="4" placeholder="goto $andere-frage$">${content.script || ''}</textarea>
+                        </div>
+                    </div>
+                    <div class="form-section"><h3>📄 Dokument-Abschnitt (optional)</h3>
+                        <div class="form-group">
+                            <textarea class="form-textarea" id="documentText" rows="3">${content.dokumenttext || ''}</textarea>
+                        </div>
+                    </div>
+                `;
+                this.reattachEventListeners();
+            }
+            reattachEventListeners() {
+                document.querySelectorAll('.question-type').forEach(typeEl => {
+                    typeEl.addEventListener('click', () => {
+                        document.querySelectorAll('.question-type').forEach(el => el.classList.remove('active'));
+                        typeEl.classList.add('active');
+                        const type = typeEl.dataset.type;
+                        document.getElementById('questionType').value = type;
+                        const answersSection = document.getElementById('answersSection');
+                        if (answersSection) answersSection.style.display = ['Single Select', 'Multiple Choice'].includes(type) ? 'block' : 'none';
+                        this.updateLivePreview();
+                    });
+                });
+                ['questionTitle', 'questionSubtitle', 'questionDesignator', 'questionScript', 'documentText'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.addEventListener('input', () => this.updateLivePreview());
+                });
+            }
             loadAnswers(answers) {
                 const answersList = document.getElementById('answersList');
+                if (!answersList) return;
                 answersList.innerHTML = '';
-                answers.forEach(answer => {
+                answers.forEach((answer, index) => {
                     const listItem = document.createElement('div');
                     listItem.className = 'list-item';
-                    listItem.innerHTML = `<input type="text" value="${answer}"><button class="btn-small danger" onclick="this.parentElement.remove(); editor.updateLivePreview()">✕</button>`;
+                    listItem.innerHTML = `
+                        <input type="text" value="${answer}">
+                        <button class="btn-small" onclick="editor.createFollowUp('${answer}', ${index})">➕ Follow-up</button>
+                        <button class="btn-small danger" onclick="this.parentElement.remove(); editor.updateLivePreview()">✕</button>
+                    `;
                     listItem.querySelector('input').addEventListener('input', () => this.updateLivePreview());
                     answersList.appendChild(listItem);
                 });
+            }
+            createAnswerFile(parentQuestion, answerText) {
+                const answerId = Date.now();
+                const answerFile = {
+                    name: `antwort-${answerText.toLowerCase().replace(/[^a-z0-9]/g, '-')}.txt`,
+                    type: 'file',
+                    enhancedContent: {
+                        titel: 'Antwort',
+                        untertitel: `Für Auswahl: ${answerText}`,
+                        bezeichner: '',
+                        fragetyp: 'Text',
+                        antworten: [],
+                        script: '',
+                        dokumenttext: ''
+                    },
+                    path: `${parentQuestion.path}/antwort-${answerId}`,
+                    content: ''
+                };
+                if (!parentQuestion.children) parentQuestion.children = [];
+                parentQuestion.children.push(answerFile);
+                return answerFile;
+            }
+            createFollowUp(answerText, index) {
+                if (!this.currentFile || this.determineFileType(this.currentFile) !== 'question') {
+                    alert('Follow-ups können nur bei Fragen erstellt werden!');
+                    return;
+                }
+                const answerFile = this.createAnswerFile(this.currentFile, answerText);
+                this.saveStructure();
+                this.renderTree();
+                alert(`Follow-up für "${answerText}" erstellt!`);
             }
             parseOldFormatToNew(oldContent) {
                 const content = { titel: '', untertitel: '', bezeichner: '', fragetyp: 'Single Select', antworten: [], script: '', dokumenttext: '' };
