@@ -9,7 +9,10 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--admin-bg); color: var(--admin-text); overflow: hidden; }
         .container { display: flex; height: 100vh; }
-        .sidebar { width: 300px; background: var(--admin-surface); border-right: 1px solid var(--admin-border); display: flex; flex-direction: column; }
+        .sidebar { width: 33.333%; min-width: 200px; max-width: 50%; background: var(--admin-surface); border-right: 1px solid var(--admin-border); display: flex; flex-direction: column; }
+        .resizer { width: 4px; background: var(--admin-border); cursor: col-resize; flex-shrink: 0; transition: background-color 0.2s; }
+        .resizer:hover { background: var(--primary-color); }
+        .main-content { flex: 1; display: flex; flex-direction: column; min-width: 300px; }
         .sidebar-header { padding: var(--spacing-md); border-bottom: 1px solid var(--admin-border); display: flex; align-items: center; gap: var(--spacing-sm); }
         .sidebar-header h2 { color: var(--admin-text); font-size: 16px; }
         .logo-container { width: 80px; height: 34px; }
@@ -109,8 +112,8 @@
     <script src="assets/js/utils/zipProcessor.js"></script>
 </head>
 <body>
-    <div class="container">
-        <div class="sidebar">
+        <div class="container">
+        <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="logo-container" id="logoContainer"></div>
                 <h2>Enhanced Editor</h2>
@@ -142,6 +145,8 @@
                 <div class="context-item" data-action="newFolder" style="padding:8px 16px; cursor:pointer; font-size:13px; color:var(--admin-text);">📁 Neuer Ordner hier</div>
             </div>
         </div>
+        <div class="resizer" id="resizer"></div>
+        <div class="main-content">
         <div class="editor-area">
             <div class="editor-header">
                 <h2>Dialog-Frage bearbeiten</h2>
@@ -240,6 +245,7 @@
                 <span id="itemCount">0 Fragen</span>
             </div>
         </div>
+        </div>
     </div>
     <input type="file" id="zipFileInput" accept=".zip" class="file-input">
     <script>
@@ -275,6 +281,7 @@
                 this.setupLivePreview();
                 this.initSearch();
                 this.initContextMenu();
+                this.initResizer();
             }
             attachEventListeners() {
                 const zipInput = document.getElementById('zipFileInput');
@@ -907,6 +914,30 @@
                 } catch (_) { this.setStatus('Fehler beim Deploy'); }
             }
             setStatus(message) { const el = document.getElementById('statusText'); if (!el) return; el.textContent = message; setTimeout(() => { el.textContent = 'Bereit'; }, 3000); }
+            initResizer() {
+                const resizer = document.getElementById('resizer');
+                const sidebar = document.getElementById('sidebar');
+                if (!resizer || !sidebar) return;
+                let isResizing = false;
+                resizer.addEventListener('mousedown', (e) => {
+                    isResizing = true;
+                    document.addEventListener('mousemove', handleMouseMove);
+                    document.addEventListener('mouseup', handleMouseUp);
+                    e.preventDefault();
+                });
+                const handleMouseMove = (e) => {
+                    if (!isResizing) return;
+                    const containerWidth = document.querySelector('.container').offsetWidth;
+                    const newWidth = (e.clientX / containerWidth) * 100;
+                    const clampedWidth = Math.max(20, Math.min(50, newWidth));
+                    sidebar.style.width = `${clampedWidth}%`;
+                };
+                const handleMouseUp = () => {
+                    isResizing = false;
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('mouseup', handleMouseUp);
+                };
+            }
         }
         let editor; document.addEventListener('DOMContentLoaded', () => { editor = new EnhancedDialogEditor(); });
     </script>
